@@ -1,3 +1,96 @@
+<?php
+require_once 'config.php';
+requireLogin();
+$currentUser = getCurrentUser();
+$userId = getCurrentUserId();
+
+$pdo = getDBConnection();
+$error = '';
+$success = '';
+
+// Handle adding member to team
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_member') {
+    $team_id = (int)$_POST['team_id'];
+    $user_id = (int)$_POST['user_id'];
+    $role = $_POST['role'] ?? 'member';
+    
+    if (empty($team_id) || empty($user_id)) {
+        $error = 'Team and user are required';
+    } else {
+        try {
+            // Check if user is already in team
+            $stmt = $pdo->prepare("SELECT id FROM team_members WHERE team_id = ? AND user_id = ?");
+            $stmt->execute([$team_id, $user_id]);
+            if ($stmt->fetch()) {
+                $error = 'User is already a member of this team';
+            } else {
+                $stmt = $pdo->prepare("INSERT INTO team_members (team_id, user_id, role) VALUES (?, ?, ?)");
+                $stmt->execute([$team_id, $user_id, $role]);
+                $success = 'Member added to team successfully!';
+                // Redirect to prevent form resubmission
+                header('Location: team.php');
+                exit;
+            }
+        } catch (PDOException $e) {
+            $error = 'Failed to add member. Please try again.';
+        }
+    }
+}
+
+// Fetch all users with their team memberships and task stats
+$stmt = $pdo->prepare("
+    SELECT 
+        u.id,
+        u.full_name,
+        u.email,
+        u.role as user_role,
+        u.avatar,
+        u.is_active,
+        COUNT(DISTINCT ts.id) as total_tasks,
+        SUM(CASE WHEN ts.status = 'done' THEN 1 ELSE 0 END) as completed_tasks,
+        GROUP_CONCAT(DISTINCT tm.team_id) as team_ids,
+        GROUP_CONCAT(DISTINCT te.name SEPARATOR ', ') as team_names
+    FROM users u
+    LEFT JOIN tasks ts ON u.id = ts.assigned_to
+    LEFT JOIN team_members tm ON u.id = tm.user_id
+    LEFT JOIN teams te ON tm.team_id = te.id
+    WHERE u.is_active = 1
+    GROUP BY u.id, u.full_name, u.email, u.role, u.avatar, u.is_active
+    ORDER BY u.full_name ASC
+");
+$stmt->execute();
+$allUsers = $stmt->fetchAll();
+
+// Calculate efficiency for each user (based on completed tasks)
+foreach ($allUsers as &$user) {
+    if ($user['total_tasks'] > 0) {
+        $user['efficiency'] = round(($user['completed_tasks'] / $user['total_tasks']) * 100);
+    } else {
+        $user['efficiency'] = 0;
+    }
+}
+
+// Get teams for dropdown
+$teams = getAllTeams();
+
+// Get all users for member dropdown (excluding current user if needed)
+$availableUsers = getAllUsers();
+
+// Get total team member count
+$teamMemberCount = count($allUsers);
+
+// Helper function to get status indicator color
+function getStatusColor($isActive) {
+    return $isActive ? 'bg-green-500' : 'bg-gray-500';
+}
+
+// Helper function to get efficiency color
+function getEfficiencyColor($efficiency) {
+    if ($efficiency >= 95) return 'text-green-400';
+    if ($efficiency >= 85) return 'text-yellow-400';
+    return 'text-red-400';
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -116,7 +209,7 @@
             <a href="team.php" class="flex items-center gap-3 px-4 py-3 text-cyan-400 bg-cyan-400/10 rounded-xl border border-cyan-400/20 transition-all">
                 <i data-lucide="users" class="w-5 h-5"></i>
                 <span class="font-medium">Team</span>
-                <span class="ml-auto text-xs bg-white/10 px-2 py-1 rounded-full text-white">8</span>
+                <span class="ml-auto text-xs bg-white/10 px-2 py-1 rounded-full text-white"><?php echo $teamMemberCount; ?></span>
             </a>
             <a href="calender.php" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
                 <i data-lucide="calendar" class="w-5 h-5"></i>
@@ -128,13 +221,13 @@
         <div class="p-4 border-t border-white/5">
             <a href="profile.php" class="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 cursor-pointer transition-colors">
                 <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-500 to-cyan-500 p-[2px]">
-                    <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100&auto=format&fit=crop" class="w-full h-full rounded-full object-cover border-2 border-[#050510]" alt="User">
+                    <img src="<?php echo htmlspecialchars($currentUser['avatar'] ?? 'https://api.dicebear.com/7.x/initials/svg?seed=' . urlencode($currentUser['full_name'])); ?>" class="w-full h-full rounded-full object-cover border-2 border-[#050510]" alt="User">
                 </div>
                 <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-white truncate">Alex Morgan</p>
-                    <p class="text-xs text-gray-400 truncate">Pro Member</p>
+                    <p class="text-sm font-medium text-white truncate"><?php echo htmlspecialchars($currentUser['full_name']); ?></p>
+                    <p class="text-xs text-gray-400 truncate"><?php echo ucfirst($currentUser['role']); ?></p>
                 </div>
-                <a href="login.php" class="text-gray-500 hover:text-red-400 transition-colors">
+                <a href="logout.php" class="text-gray-500 hover:text-red-400 transition-colors">
                     <i data-lucide="log-out" class="w-4 h-4"></i>
                 </a>
             </a>
@@ -187,172 +280,81 @@
         <!-- Team Grid -->
         <div class="flex-1 overflow-y-auto p-6">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-
-                <!-- Team Member 1 -->
+                <?php 
+                // Gradient colors for avatars
+                $gradients = [
+                    'from-cyan-400 to-purple-600',
+                    'from-purple-500 to-pink-500',
+                    'from-blue-500 to-cyan-500',
+                    'from-pink-500 to-orange-500',
+                    'from-green-500 to-teal-500',
+                    'from-yellow-500 to-orange-500',
+                    'from-indigo-500 to-purple-500',
+                    'from-red-500 to-pink-500'
+                ];
+                
+                foreach ($allUsers as $index => $user): 
+                    $gradient = $gradients[$index % count($gradients)];
+                    $statusColor = getStatusColor($user['is_active']);
+                    $efficiencyColor = getEfficiencyColor($user['efficiency']);
+                    $avatarUrl = $user['avatar'] ?: 'https://api.dicebear.com/7.x/initials/svg?seed=' . urlencode($user['full_name']);
+                ?>
+                <!-- Team Member Card -->
                 <div class="glass-panel p-6 rounded-2xl team-card text-center group relative overflow-hidden">
                     <div class="absolute top-4 right-4">
-                         <span class="flex h-3 w-3 relative">
+                        <span class="flex h-3 w-3 relative">
+                            <?php if ($user['is_active']): ?>
                             <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                            <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                            <?php endif; ?>
+                            <span class="relative inline-flex rounded-full h-3 w-3 <?php echo $statusColor; ?>"></span>
                         </span>
                     </div>
                     
                     <div class="relative inline-block mb-4">
-                        <div class="w-24 h-24 rounded-full p-[2px] bg-gradient-to-br from-cyan-400 to-purple-600">
-                            <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&fit=crop" class="w-full h-full rounded-full object-cover border-4 border-[#050510]" alt="Alex Morgan">
+                        <div class="w-24 h-24 rounded-full p-[2px] bg-gradient-to-br <?php echo $gradient; ?>">
+                            <img src="<?php echo htmlspecialchars($avatarUrl); ?>" class="w-full h-full rounded-full object-cover border-4 border-[#050510]" alt="<?php echo htmlspecialchars($user['full_name']); ?>">
                         </div>
                     </div>
                     
-                    <h3 class="text-lg font-bold text-white mb-1">Alex Morgan</h3>
-                    <p class="text-cyan-400 text-sm mb-4">Product Designer</p>
+                    <h3 class="text-lg font-bold text-white mb-1"><?php echo htmlspecialchars($user['full_name']); ?></h3>
+                    <p class="text-cyan-400 text-sm mb-4"><?php echo ucfirst($user['user_role']); ?></p>
                     
+                    <?php if ($user['team_names']): ?>
                     <div class="flex flex-wrap justify-center gap-2 mb-6">
-                        <span class="px-2 py-1 rounded text-xs bg-white/5 text-gray-400 border border-white/5">Figma</span>
-                        <span class="px-2 py-1 rounded text-xs bg-white/5 text-gray-400 border border-white/5">UI/UX</span>
-                        <span class="px-2 py-1 rounded text-xs bg-white/5 text-gray-400 border border-white/5">Prototyping</span>
+                        <?php 
+                        $teamNames = explode(', ', $user['team_names']);
+                        foreach (array_slice($teamNames, 0, 3) as $teamName): 
+                        ?>
+                        <span class="px-2 py-1 rounded text-xs bg-white/5 text-gray-400 border border-white/5"><?php echo htmlspecialchars($teamName); ?></span>
+                        <?php endforeach; ?>
+                        <?php if (count($teamNames) > 3): ?>
+                        <span class="px-2 py-1 rounded text-xs bg-white/5 text-gray-400 border border-white/5">+<?php echo count($teamNames) - 3; ?></span>
+                        <?php endif; ?>
                     </div>
+                    <?php else: ?>
+                    <div class="flex flex-wrap justify-center gap-2 mb-6">
+                        <span class="px-2 py-1 rounded text-xs bg-white/5 text-gray-500 border border-white/5">No Team</span>
+                    </div>
+                    <?php endif; ?>
 
                     <div class="grid grid-cols-2 gap-4 border-t border-white/5 pt-4 mb-4">
                         <div>
                             <p class="text-xs text-gray-500">Tasks</p>
-                            <p class="font-bold text-white">42</p>
+                            <p class="font-bold text-white"><?php echo $user['total_tasks']; ?></p>
                         </div>
                         <div>
                             <p class="text-xs text-gray-500">Efficiency</p>
-                            <p class="font-bold text-green-400">98%</p>
+                            <p class="font-bold <?php echo $efficiencyColor; ?>"><?php echo $user['efficiency']; ?>%</p>
                         </div>
                     </div>
 
                     <div class="flex justify-center gap-4 social-links">
-                        <button class="text-gray-400 hover:text-white transition-colors"><i data-lucide="mail" class="w-5 h-5"></i></button>
+                        <a href="mailto:<?php echo htmlspecialchars($user['email']); ?>" class="text-gray-400 hover:text-white transition-colors"><i data-lucide="mail" class="w-5 h-5"></i></a>
                         <button class="text-gray-400 hover:text-white transition-colors"><i data-lucide="message-square" class="w-5 h-5"></i></button>
-                        <button class="text-gray-400 hover:text-white transition-colors"><i data-lucide="github" class="w-5 h-5"></i></button>
+                        <button class="text-gray-400 hover:text-white transition-colors"><i data-lucide="user" class="w-5 h-5"></i></button>
                     </div>
                 </div>
-
-                <!-- Team Member 2 -->
-                <div class="glass-panel p-6 rounded-2xl team-card text-center group relative overflow-hidden">
-                    <div class="absolute top-4 right-4">
-                        <span class="flex h-3 w-3 relative">
-                           <span class="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span>
-                       </span>
-                   </div>
-                    
-                    <div class="relative inline-block mb-4">
-                        <div class="w-24 h-24 rounded-full p-[2px] bg-gradient-to-br from-purple-500 to-pink-500">
-                            <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&fit=crop" class="w-full h-full rounded-full object-cover border-4 border-[#050510]" alt="Sarah Connor">
-                        </div>
-                    </div>
-                    
-                    <h3 class="text-lg font-bold text-white mb-1">Sarah Connor</h3>
-                    <p class="text-purple-400 text-sm mb-4">Frontend Engineer</p>
-                    
-                    <div class="flex flex-wrap justify-center gap-2 mb-6">
-                        <span class="px-2 py-1 rounded text-xs bg-white/5 text-gray-400 border border-white/5">React</span>
-                        <span class="px-2 py-1 rounded text-xs bg-white/5 text-gray-400 border border-white/5">Tailwind</span>
-                        <span class="px-2 py-1 rounded text-xs bg-white/5 text-gray-400 border border-white/5">TS</span>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4 border-t border-white/5 pt-4 mb-4">
-                        <div>
-                            <p class="text-xs text-gray-500">Tasks</p>
-                            <p class="font-bold text-white">35</p>
-                        </div>
-                        <div>
-                            <p class="text-xs text-gray-500">Efficiency</p>
-                            <p class="font-bold text-green-400">95%</p>
-                        </div>
-                    </div>
-
-                    <div class="flex justify-center gap-4 social-links">
-                        <button class="text-gray-400 hover:text-white transition-colors"><i data-lucide="mail" class="w-5 h-5"></i></button>
-                        <button class="text-gray-400 hover:text-white transition-colors"><i data-lucide="message-square" class="w-5 h-5"></i></button>
-                        <button class="text-gray-400 hover:text-white transition-colors"><i data-lucide="github" class="w-5 h-5"></i></button>
-                    </div>
-                </div>
-
-                <!-- Team Member 3 -->
-                <div class="glass-panel p-6 rounded-2xl team-card text-center group relative overflow-hidden">
-                    <div class="absolute top-4 right-4">
-                        <span class="flex h-3 w-3 relative">
-                           <span class="relative inline-flex rounded-full h-3 w-3 bg-gray-500"></span>
-                       </span>
-                   </div>
-                    
-                    <div class="relative inline-block mb-4">
-                        <div class="w-24 h-24 rounded-full p-[2px] bg-gradient-to-br from-blue-500 to-cyan-500">
-                            <img src="https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=200&fit=crop" class="w-full h-full rounded-full object-cover border-4 border-[#050510]" alt="Michael Chen">
-                        </div>
-                    </div>
-                    
-                    <h3 class="text-lg font-bold text-white mb-1">Michael Chen</h3>
-                    <p class="text-blue-400 text-sm mb-4">Backend Developer</p>
-                    
-                    <div class="flex flex-wrap justify-center gap-2 mb-6">
-                        <span class="px-2 py-1 rounded text-xs bg-white/5 text-gray-400 border border-white/5">Node.js</span>
-                        <span class="px-2 py-1 rounded text-xs bg-white/5 text-gray-400 border border-white/5">SQL</span>
-                        <span class="px-2 py-1 rounded text-xs bg-white/5 text-gray-400 border border-white/5">API</span>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4 border-t border-white/5 pt-4 mb-4">
-                        <div>
-                            <p class="text-xs text-gray-500">Tasks</p>
-                            <p class="font-bold text-white">28</p>
-                        </div>
-                        <div>
-                            <p class="text-xs text-gray-500">Efficiency</p>
-                            <p class="font-bold text-yellow-400">92%</p>
-                        </div>
-                    </div>
-
-                    <div class="flex justify-center gap-4 social-links">
-                        <button class="text-gray-400 hover:text-white transition-colors"><i data-lucide="mail" class="w-5 h-5"></i></button>
-                        <button class="text-gray-400 hover:text-white transition-colors"><i data-lucide="message-square" class="w-5 h-5"></i></button>
-                        <button class="text-gray-400 hover:text-white transition-colors"><i data-lucide="github" class="w-5 h-5"></i></button>
-                    </div>
-                </div>
-
-                <!-- Team Member 4 -->
-                <div class="glass-panel p-6 rounded-2xl team-card text-center group relative overflow-hidden">
-                    <div class="absolute top-4 right-4">
-                        <span class="flex h-3 w-3 relative">
-                           <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                           <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-                       </span>
-                   </div>
-                    
-                    <div class="relative inline-block mb-4">
-                        <div class="w-24 h-24 rounded-full p-[2px] bg-gradient-to-br from-pink-500 to-orange-500">
-                            <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&fit=crop" class="w-full h-full rounded-full object-cover border-4 border-[#050510]" alt="Emily Davis">
-                        </div>
-                    </div>
-                    
-                    <h3 class="text-lg font-bold text-white mb-1">Emily Davis</h3>
-                    <p class="text-pink-400 text-sm mb-4">Marketing Lead</p>
-                    
-                    <div class="flex flex-wrap justify-center gap-2 mb-6">
-                        <span class="px-2 py-1 rounded text-xs bg-white/5 text-gray-400 border border-white/5">SEO</span>
-                        <span class="px-2 py-1 rounded text-xs bg-white/5 text-gray-400 border border-white/5">Content</span>
-                        <span class="px-2 py-1 rounded text-xs bg-white/5 text-gray-400 border border-white/5">Social</span>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4 border-t border-white/5 pt-4 mb-4">
-                        <div>
-                            <p class="text-xs text-gray-500">Tasks</p>
-                            <p class="font-bold text-white">15</p>
-                        </div>
-                        <div>
-                            <p class="text-xs text-gray-500">Efficiency</p>
-                            <p class="font-bold text-green-400">99%</p>
-                        </div>
-                    </div>
-
-                    <div class="flex justify-center gap-4 social-links">
-                        <button class="text-gray-400 hover:text-white transition-colors"><i data-lucide="mail" class="w-5 h-5"></i></button>
-                        <button class="text-gray-400 hover:text-white transition-colors"><i data-lucide="message-square" class="w-5 h-5"></i></button>
-                        <button class="text-gray-400 hover:text-white transition-colors"><i data-lucide="linkedin" class="w-5 h-5"></i></button>
-                    </div>
-                </div>
+                <?php endforeach; ?>
 
                 <!-- Add New Member Card -->
                 <div onclick="openModal()" class="border-2 border-dashed border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:border-cyan-500/50 hover:bg-white/5 transition-all group min-h-[350px]">
@@ -371,48 +373,54 @@
     <div id="addMemberModal" class="fixed inset-0 z-50 hidden">
         <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeModal()"></div>
         <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-lg p-6 rounded-2xl glass-panel border border-white/10 shadow-2xl">
-            <h2 class="text-2xl font-bold mb-6 text-white">Invite Team Member</h2>
-            <form>
+            <h2 class="text-2xl font-bold mb-6 text-white">Add Member to Team</h2>
+            <?php if ($error): ?>
+            <div class="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                <?php echo htmlspecialchars($error); ?>
+            </div>
+            <?php endif; ?>
+            <?php if ($success): ?>
+            <div class="mb-4 p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-sm">
+                <?php echo htmlspecialchars($success); ?>
+            </div>
+            <?php endif; ?>
+            <form method="POST" action="team.php" id="memberForm">
+                <input type="hidden" name="action" value="add_member">
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-sm text-gray-400 mb-1">Full Name</label>
-                        <input type="text" class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-cyan-500 outline-none" placeholder="e.g. John Doe">
+                        <label class="block text-sm text-gray-400 mb-1">Select User *</label>
+                        <select name="user_id" required class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-cyan-500 outline-none">
+                            <option value="">Choose a user...</option>
+                            <?php foreach ($availableUsers as $user): ?>
+                            <option value="<?php echo $user['id']; ?>"><?php echo htmlspecialchars($user['full_name'] . ' (' . $user['email'] . ')'); ?></option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
                     <div>
-                        <label class="block text-sm text-gray-400 mb-1">Email Address</label>
-                        <input type="email" class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-cyan-500 outline-none" placeholder="john@example.com">
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm text-gray-400 mb-1">Department</label>
-                            <select class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white outline-none">
-                                <option>Engineering</option>
-                                <option>Design</option>
-                                <option>Marketing</option>
-                                <option>Product</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm text-gray-400 mb-1">Role</label>
-                            <input type="text" class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white outline-none" placeholder="e.g. Junior Dev">
-                        </div>
+                        <label class="block text-sm text-gray-400 mb-1">Select Team *</label>
+                        <select name="team_id" required class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-cyan-500 outline-none">
+                            <option value="">Choose a team...</option>
+                            <?php foreach ($teams as $team): ?>
+                            <option value="<?php echo $team['id']; ?>"><?php echo htmlspecialchars($team['name']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
                     <div>
-                        <label class="block text-sm text-gray-400 mb-1">Permissions</label>
+                        <label class="block text-sm text-gray-400 mb-1">Team Role</label>
                         <div class="flex gap-4 mt-2">
-                             <label class="flex items-center gap-2 cursor-pointer">
-                                <input type="radio" name="perm" class="text-cyan-500 focus:ring-cyan-500 bg-gray-700 border-gray-600" checked>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="role" value="member" class="text-cyan-500 focus:ring-cyan-500 bg-gray-700 border-gray-600" checked>
                                 <span class="text-sm text-gray-300">Member</span>
                             </label>
                             <label class="flex items-center gap-2 cursor-pointer">
-                                <input type="radio" name="perm" class="text-cyan-500 focus:ring-cyan-500 bg-gray-700 border-gray-600">
-                                <span class="text-sm text-gray-300">Admin</span>
+                                <input type="radio" name="role" value="leader" class="text-cyan-500 focus:ring-cyan-500 bg-gray-700 border-gray-600">
+                                <span class="text-sm text-gray-300">Leader</span>
                             </label>
                         </div>
                     </div>
                     <div class="pt-4 flex justify-end gap-3">
                         <button type="button" class="px-4 py-2 rounded-lg text-gray-300 hover:text-white hover:bg-white/5" onclick="closeModal()">Cancel</button>
-                        <button type="button" class="px-6 py-2 rounded-lg bg-cyan-500 text-black font-bold hover:bg-cyan-400">Send Invite</button>
+                        <button type="submit" class="px-6 py-2 rounded-lg bg-cyan-500 text-black font-bold hover:bg-cyan-400">Add to Team</button>
                     </div>
                 </div>
             </form>
@@ -442,9 +450,11 @@
         // Modal Functions
         function openModal() {
             document.getElementById('addMemberModal').classList.remove('hidden');
+            lucide.createIcons();
         }
         function closeModal() {
             document.getElementById('addMemberModal').classList.add('hidden');
+            document.getElementById('memberForm').reset();
         }
     </script>
 </body>

@@ -1,3 +1,119 @@
+<?php
+require_once 'config.php';
+requireLogin();
+
+$currentUser = getCurrentUser();
+$userId = getCurrentUserId();
+
+$message = '';
+$messageType = '';
+
+// Handle profile update form submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
+    try {
+        $pdo = getDBConnection();
+        
+        $firstName = trim($_POST['first_name'] ?? '');
+        $lastName = trim($_POST['last_name'] ?? '');
+        $email = trim($_POST['email'] ?? '');
+        $phone = trim($_POST['phone'] ?? '');
+        $bio = trim($_POST['bio'] ?? '');
+        
+        // Validate required fields
+        if (empty($firstName) || empty($lastName) || empty($email)) {
+            $message = 'First name, last name, and email are required.';
+            $messageType = 'error';
+        } else {
+            // Check if email is already taken by another user
+            $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ? AND id != ?");
+            $stmt->execute([$email, $userId]);
+            if ($stmt->fetch()) {
+                $message = 'Email is already taken by another user.';
+                $messageType = 'error';
+            } else {
+                // Update user profile
+                $fullName = $firstName . ' ' . $lastName;
+                $stmt = $pdo->prepare("UPDATE users SET full_name = ?, email = ?, phone = ?, bio = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+                $stmt->execute([$fullName, $email, $phone ?: null, $bio ?: null, $userId]);
+                
+                // Update session
+                $_SESSION['user_name'] = $fullName;
+                $_SESSION['user_email'] = $email;
+                
+                $message = 'Profile updated successfully!';
+                $messageType = 'success';
+                
+                // Refresh user data
+                $currentUser = getCurrentUser();
+            }
+        }
+    } catch (Exception $e) {
+        $message = 'Error updating profile: ' . $e->getMessage();
+        $messageType = 'error';
+    }
+}
+
+// Fetch complete user data with statistics
+try {
+    $pdo = getDBConnection();
+    
+    // Get full user details
+    $stmt = $pdo->prepare("SELECT id, full_name, email, role, avatar, phone, bio, created_at FROM users WHERE id = ?");
+    $stmt->execute([$userId]);
+    $userData = $stmt->fetch();
+    
+    if (!$userData) {
+        header('Location: login.php');
+        exit;
+    }
+    
+    // Parse full name into first and last name
+    $nameParts = explode(' ', $userData['full_name'], 2);
+    $firstName = $nameParts[0] ?? '';
+    $lastName = $nameParts[1] ?? '';
+    
+    // Get task count
+    $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM tasks WHERE assigned_to = ?");
+    $stmt->execute([$userId]);
+    $taskCount = $stmt->fetch()['count'];
+    
+    // Get project count (projects user is assigned to via teams or created)
+    $stmt = $pdo->prepare("
+        SELECT COUNT(DISTINCT p.id) as count 
+        FROM projects p
+        LEFT JOIN teams t ON p.team_id = t.id
+        LEFT JOIN team_members tm ON t.id = tm.team_id
+        WHERE p.created_by = ? OR tm.user_id = ?
+    ");
+    $stmt->execute([$userId, $userId]);
+    $projectCount = $stmt->fetch()['count'];
+    
+    // Get user teams and roles
+    $stmt = $pdo->prepare("
+        SELECT t.name as team_name, tm.role as team_role
+        FROM team_members tm
+        JOIN teams t ON tm.team_id = t.id
+        WHERE tm.user_id = ?
+        ORDER BY tm.role DESC, t.name
+    ");
+    $stmt->execute([$userId]);
+    $userTeams = $stmt->fetchAll();
+    
+    // Get primary role/department (first team or default)
+    $primaryTeam = !empty($userTeams) ? $userTeams[0] : null;
+    $roleTitle = ucfirst($primaryTeam['team_role'] ?? $userData['role']);
+    $department = $primaryTeam['team_name'] ?? 'General';
+    
+    // Format join date
+    $joinDate = $userData['created_at'] ? date('F Y', strtotime($userData['created_at'])) : 'N/A';
+    
+    // Get avatar or use default
+    $avatarUrl = $userData['avatar'] ?: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=400&auto=format&fit=crop';
+    
+} catch (Exception $e) {
+    die("Error loading profile: " . $e->getMessage());
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
