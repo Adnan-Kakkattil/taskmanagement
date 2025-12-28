@@ -2,6 +2,152 @@
 require_once 'config.php';
 requireLogin();
 $currentUser = getCurrentUser();
+$userId = getCurrentUserId();
+
+$pdo = getDBConnection();
+
+// Fetch Task Statistics
+$stmt = $pdo->prepare("
+    SELECT 
+        COUNT(*) as total_tasks,
+        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_tasks,
+        SUM(CASE WHEN status = 'progress' THEN 1 ELSE 0 END) as in_progress_tasks,
+        SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) as completed_tasks,
+        SUM(CASE WHEN status = 'pending' AND due_date < CURDATE() THEN 1 ELSE 0 END) as overdue_tasks
+    FROM tasks 
+    WHERE assigned_to = ?
+");
+$stmt->execute([$userId]);
+$stats = $stmt->fetch();
+
+// Calculate percentage change (comparing this week to last week)
+$stmt = $pdo->prepare("
+    SELECT 
+        SUM(CASE WHEN DATE(created_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) THEN 1 ELSE 0 END) as this_week,
+        SUM(CASE WHEN DATE(created_at) >= DATE_SUB(CURDATE(), INTERVAL 14 DAY) 
+                 AND DATE(created_at) < DATE_SUB(CURDATE(), INTERVAL 7 DAY) THEN 1 ELSE 0 END) as last_week
+    FROM tasks 
+    WHERE assigned_to = ?
+");
+$stmt->execute([$userId]);
+$weekComparison = $stmt->fetch();
+$totalChange = 0;
+if ($weekComparison['last_week'] > 0) {
+    $totalChange = round((($weekComparison['this_week'] - $weekComparison['last_week']) / $weekComparison['last_week']) * 100);
+}
+
+// Get tasks completed today
+$stmt = $pdo->prepare("
+    SELECT COUNT(*) as completed_today
+    FROM tasks 
+    WHERE assigned_to = ? AND status = 'done' AND DATE(completed_at) = CURDATE()
+");
+$stmt->execute([$userId]);
+$completedToday = $stmt->fetch()['completed_today'];
+
+// Fetch Recent Tasks (limit 10)
+$stmt = $pdo->prepare("
+    SELECT t.*, p.name as project_name, u.full_name as assigned_to_name
+    FROM tasks t
+    LEFT JOIN projects p ON t.project_id = p.id
+    LEFT JOIN users u ON t.assigned_to = u.id
+    WHERE t.assigned_to = ?
+    ORDER BY t.created_at DESC
+    LIMIT 10
+");
+$stmt->execute([$userId]);
+$recentTasks = $stmt->fetchAll();
+
+// Fetch Upcoming Deadlines (next 7 days)
+$stmt = $pdo->prepare("
+    SELECT t.*, p.name as project_name
+    FROM tasks t
+    LEFT JOIN projects p ON t.project_id = p.id
+    WHERE t.assigned_to = ? 
+    AND t.due_date IS NOT NULL 
+    AND t.due_date >= CURDATE() 
+    AND t.due_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+    AND t.status != 'done'
+    ORDER BY t.due_date ASC, t.priority DESC
+    LIMIT 5
+");
+$stmt->execute([$userId]);
+$upcomingDeadlines = $stmt->fetchAll();
+
+// Fetch Chart Data - Tasks completed per day for last 7 days
+$stmt = $pdo->prepare("
+    SELECT 
+        DATE(completed_at) as date,
+        COUNT(*) as count
+    FROM tasks 
+    WHERE assigned_to = ? 
+    AND status = 'done' 
+    AND completed_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+    GROUP BY DATE(completed_at)
+    ORDER BY date ASC
+");
+$stmt->execute([$userId]);
+$chartDataRaw = $stmt->fetchAll();
+
+// Create chart data for last 7 days
+$chartLabels = [];
+$chartData = [];
+$days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+// Get last 7 days
+for ($i = 6; $i >= 0; $i--) {
+    $date = date('Y-m-d', strtotime("-$i days"));
+    $dayName = $days[date('w', strtotime($date))];
+    $chartLabels[] = $dayName;
+    
+    // Find matching data
+    $found = false;
+    foreach ($chartDataRaw as $row) {
+        if ($row['date'] == $date) {
+            $chartData[] = (int)$row['count'];
+            $found = true;
+            break;
+        }
+    }
+    if (!$found) {
+        $chartData[] = 0;
+    }
+}
+
+// Helper function to format date
+function formatDate($date) {
+    if (!$date) return 'No date';
+    $timestamp = strtotime($date);
+    $today = strtotime('today');
+    $tomorrow = strtotime('tomorrow');
+    
+    if ($timestamp < $today) {
+        return date('M j', $timestamp);
+    } elseif ($timestamp == $today) {
+        return 'Today';
+    } elseif ($timestamp == $tomorrow) {
+        return 'Tomorrow';
+    } else {
+        return date('M j', $timestamp);
+    }
+}
+
+// Helper function to get priority display
+function getPriorityDisplay($priority) {
+    switch ($priority) {
+        case 'high':
+            return ['class' => 'status-high', 'dot' => 'bg-red-400', 'text' => 'High'];
+        case 'medium':
+            return ['class' => 'status-med', 'dot' => 'bg-yellow-400', 'text' => 'Medium'];
+        case 'low':
+            return ['class' => 'status-low', 'dot' => 'bg-green-400', 'text' => 'Low'];
+        default:
+            return ['class' => 'status-med', 'dot' => 'bg-gray-400', 'text' => 'Medium'];
+    }
+}
+
+// Get projects for task creation form
+$projects = getAllProjects();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -153,7 +299,7 @@ $currentUser = getCurrentUser();
             <a href="tasks.php" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
                 <i data-lucide="check-square" class="w-5 h-5"></i>
                 <span class="font-medium">My Tasks</span>
-                <span class="ml-auto text-xs bg-white/10 px-2 py-1 rounded-full text-white">12</span>
+                <span class="ml-auto text-xs bg-white/10 px-2 py-1 rounded-full text-white"><?php echo $stats['total_tasks'] ?? 0; ?></span>
             </a>
             <a href="projects.php" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
                 <i data-lucide="folder-kanban" class="w-5 h-5"></i>
@@ -229,10 +375,15 @@ $currentUser = getCurrentUser();
                     </div>
                     <div class="relative z-10">
                         <p class="text-sm text-gray-400 font-medium mb-1">Total Tasks</p>
-                        <h3 class="text-3xl font-bold text-white">42</h3>
-                        <p class="text-xs text-green-400 flex items-center gap-1 mt-2">
-                            <i data-lucide="trending-up" class="w-3 h-3"></i> +12% from last week
+                        <h3 class="text-3xl font-bold text-white"><?php echo $stats['total_tasks'] ?? 0; ?></h3>
+                        <?php if ($totalChange != 0): ?>
+                        <p class="text-xs <?php echo $totalChange > 0 ? 'text-green-400' : 'text-red-400'; ?> flex items-center gap-1 mt-2">
+                            <i data-lucide="<?php echo $totalChange > 0 ? 'trending-up' : 'trending-down'; ?>" class="w-3 h-3"></i> 
+                            <?php echo $totalChange > 0 ? '+' : ''; ?><?php echo $totalChange; ?>% from last week
                         </p>
+                        <?php else: ?>
+                        <p class="text-xs text-gray-400 mt-2">No change from last week</p>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -243,10 +394,14 @@ $currentUser = getCurrentUser();
                     </div>
                     <div class="relative z-10">
                         <p class="text-sm text-gray-400 font-medium mb-1">Pending</p>
-                        <h3 class="text-3xl font-bold text-white">14</h3>
+                        <h3 class="text-3xl font-bold text-white"><?php echo $stats['pending_tasks'] ?? 0; ?></h3>
+                        <?php if ($stats['overdue_tasks'] > 0): ?>
                         <p class="text-xs text-yellow-400 flex items-center gap-1 mt-2">
-                            <i data-lucide="alert-circle" class="w-3 h-3"></i> 3 overdue
+                            <i data-lucide="alert-circle" class="w-3 h-3"></i> <?php echo $stats['overdue_tasks']; ?> overdue
                         </p>
+                        <?php else: ?>
+                        <p class="text-xs text-gray-400 mt-2">All on track</p>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -257,7 +412,7 @@ $currentUser = getCurrentUser();
                     </div>
                     <div class="relative z-10">
                         <p class="text-sm text-gray-400 font-medium mb-1">In Progress</p>
-                        <h3 class="text-3xl font-bold text-white">8</h3>
+                        <h3 class="text-3xl font-bold text-white"><?php echo $stats['in_progress_tasks'] ?? 0; ?></h3>
                         <p class="text-xs text-gray-400 mt-2">Active now</p>
                     </div>
                 </div>
@@ -269,10 +424,14 @@ $currentUser = getCurrentUser();
                     </div>
                     <div class="relative z-10">
                         <p class="text-sm text-gray-400 font-medium mb-1">Completed</p>
-                        <h3 class="text-3xl font-bold text-white">20</h3>
+                        <h3 class="text-3xl font-bold text-white"><?php echo $stats['completed_tasks'] ?? 0; ?></h3>
+                        <?php if ($completedToday > 0): ?>
                         <p class="text-xs text-green-400 flex items-center gap-1 mt-2">
-                            <i data-lucide="trending-up" class="w-3 h-3"></i> +5 today
+                            <i data-lucide="trending-up" class="w-3 h-3"></i> +<?php echo $completedToday; ?> today
                         </p>
+                        <?php else: ?>
+                        <p class="text-xs text-gray-400 mt-2">Keep going!</p>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>

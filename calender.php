@@ -1,3 +1,91 @@
+<?php
+require_once 'config.php';
+requireLogin();
+$currentUser = getCurrentUser();
+$userId = getCurrentUserId();
+
+$pdo = getDBConnection();
+
+// Get current month and year from URL or use current date
+$month = isset($_GET['month']) ? (int)$_GET['month'] : date('n');
+$year = isset($_GET['year']) ? (int)$_GET['year'] : date('Y');
+
+// Validate month and year
+if ($month < 1 || $month > 12) $month = date('n');
+if ($year < 2000 || $year > 2100) $year = date('Y');
+
+// Calculate previous and next month
+$prevMonth = $month - 1;
+$prevYear = $year;
+if ($prevMonth < 1) {
+    $prevMonth = 12;
+    $prevYear--;
+}
+
+$nextMonth = $month + 1;
+$nextYear = $year;
+if ($nextMonth > 12) {
+    $nextMonth = 1;
+    $nextYear++;
+}
+
+// Get first day of month and number of days
+$firstDay = mktime(0, 0, 0, $month, 1, $year);
+$daysInMonth = date('t', $firstDay);
+$dayOfWeek = date('w', $firstDay); // 0 = Sunday, 6 = Saturday
+
+// Get start date and end date for query
+$startDate = date('Y-m-01', $firstDay);
+$endDate = date('Y-m-t', $firstDay);
+
+// Fetch tasks for the current month assigned to the user
+$stmt = $pdo->prepare("
+    SELECT t.*, p.name as project_name 
+    FROM tasks t 
+    LEFT JOIN projects p ON t.project_id = p.id 
+    WHERE t.assigned_to = ? 
+    AND t.due_date IS NOT NULL
+    AND t.due_date >= ? 
+    AND t.due_date <= ?
+    ORDER BY t.due_date ASC, t.priority DESC
+");
+$stmt->execute([$userId, $startDate, $endDate]);
+$tasks = $stmt->fetchAll();
+
+// Group tasks by date
+$tasksByDate = [];
+foreach ($tasks as $task) {
+    $date = date('j', strtotime($task['due_date'])); // Day of month (1-31)
+    if (!isset($tasksByDate[$date])) {
+        $tasksByDate[$date] = [];
+    }
+    $tasksByDate[$date][] = $task;
+}
+
+// Get today's date for highlighting
+$today = date('Y-m-d');
+$currentMonthYear = date('Y-m');
+$displayMonthYear = date('Y-m', $firstDay);
+
+// Helper function to get event class based on priority and status
+function getEventClass($task) {
+    if ($task['priority'] === 'high') {
+        return 'event-urgent';
+    } elseif ($task['status'] === 'done') {
+        return 'event-task';
+    } else {
+        return 'event-task';
+    }
+}
+
+// Get projects for dropdown
+$projects = getAllProjects();
+
+// Month names
+$monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+               'July', 'August', 'September', 'October', 'November', 'December'];
+$monthName = $monthNames[$month - 1];
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -171,13 +259,13 @@
         <div class="p-4 border-t border-white/5">
             <a href="profile.php" class="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 cursor-pointer transition-colors">
                 <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-500 to-cyan-500 p-[2px]">
-                    <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100&auto=format&fit=crop" class="w-full h-full rounded-full object-cover border-2 border-[#050510]" alt="User">
+                    <img src="<?php echo htmlspecialchars($currentUser['avatar'] ?? 'https://api.dicebear.com/7.x/initials/svg?seed=' . urlencode($currentUser['full_name'])); ?>" class="w-full h-full rounded-full object-cover border-2 border-[#050510]" alt="User">
                 </div>
                 <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-white truncate">Alex Morgan</p>
-                    <p class="text-xs text-gray-400 truncate">Pro Member</p>
+                    <p class="text-sm font-medium text-white truncate"><?php echo htmlspecialchars($currentUser['full_name']); ?></p>
+                    <p class="text-xs text-gray-400 truncate"><?php echo ucfirst($currentUser['role']); ?></p>
                 </div>
-                <a href="login.php" class="text-gray-500 hover:text-red-400 transition-colors">
+                <a href="logout.php" class="text-gray-500 hover:text-red-400 transition-colors">
                     <i data-lucide="log-out" class="w-4 h-4"></i>
                 </a>
             </a>
@@ -195,20 +283,20 @@
                 </button>
                 <div class="flex flex-col">
                     <h1 class="text-xl font-bold hidden sm:block">Calendar</h1>
-                    <span class="text-xs text-gray-400 hidden sm:block">October 2023</span>
+                    <span class="text-xs text-gray-400 hidden sm:block"><?php echo $monthName . ' ' . $year; ?></span>
                 </div>
             </div>
 
             <!-- Header Actions -->
             <div class="flex items-center gap-4">
                 <div class="flex items-center bg-white/5 rounded-lg border border-white/10 p-1">
-                    <button class="p-1.5 hover:bg-white/10 rounded-md text-gray-400 hover:text-white">
+                    <a href="?month=<?php echo $prevMonth; ?>&year=<?php echo $prevYear; ?>" class="p-1.5 hover:bg-white/10 rounded-md text-gray-400 hover:text-white">
                         <i data-lucide="chevron-left" class="w-5 h-5"></i>
-                    </button>
-                    <span class="px-3 text-sm font-medium">Today</span>
-                    <button class="p-1.5 hover:bg-white/10 rounded-md text-gray-400 hover:text-white">
+                    </a>
+                    <a href="?month=<?php echo date('n'); ?>&year=<?php echo date('Y'); ?>" class="px-3 text-sm font-medium hover:text-cyan-400">Today</a>
+                    <a href="?month=<?php echo $nextMonth; ?>&year=<?php echo $nextYear; ?>" class="p-1.5 hover:bg-white/10 rounded-md text-gray-400 hover:text-white">
                         <i data-lucide="chevron-right" class="w-5 h-5"></i>
-                    </button>
+                    </a>
                 </div>
 
                 <div class="flex bg-white/5 rounded-lg p-1 border border-white/10 hidden sm:flex">
@@ -241,192 +329,64 @@
             <!-- Calendar Grid -->
             <div class="calendar-grid">
                 
-                <!-- Previous Month -->
-                <div class="calendar-day inactive">
-                    <div class="day-number text-sm">29</div>
-                </div>
-                <div class="calendar-day inactive">
-                    <div class="day-number text-sm">30</div>
-                </div>
-
-                <!-- Current Month (October) -->
-                <!-- Day 1 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">1</div>
-                    <div class="event-chip event-meeting">10:00 Team Sync</div>
-                </div>
+                <?php
+                // Get last day of previous month
+                $prevMonthDays = date('t', mktime(0, 0, 0, $prevMonth, 1, $prevYear));
                 
-                <!-- Day 2 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">2</div>
-                </div>
-
-                <!-- Day 3 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">3</div>
-                    <div class="event-chip event-task">Frontend Fixes</div>
-                </div>
-
-                <!-- Day 4 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">4</div>
-                    <div class="event-chip event-meeting">14:00 Client Call</div>
-                </div>
-
-                <!-- Day 5 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">5</div>
-                </div>
-
-                <!-- Day 6 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">6</div>
-                    <div class="event-chip event-urgent">Deploy v2.1</div>
-                </div>
-
-                <!-- Day 7 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">7</div>
-                </div>
-
-                <!-- Day 8 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">8</div>
-                </div>
-
-                <!-- Day 9 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">9</div>
-                    <div class="event-chip event-meeting">Weekly Review</div>
-                </div>
-
-                <!-- Day 10 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">10</div>
-                </div>
-
-                <!-- Day 11 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">11</div>
-                </div>
-
-                <!-- Day 12 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">12</div>
-                    <div class="event-chip event-task">Design Handoff</div>
-                    <div class="event-chip event-meeting">15:30 Sprint Planning</div>
-                </div>
-
-                <!-- Day 13 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">13</div>
-                </div>
-
-                <!-- Day 14 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">14</div>
-                </div>
-
-                <!-- Day 15 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">15</div>
-                </div>
-
-                <!-- Day 16 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">16</div>
-                    <div class="event-chip event-meeting">11:00 Marketing Sync</div>
-                </div>
-
-                <!-- Day 17 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">17</div>
-                </div>
-
-                <!-- Day 18 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">18</div>
-                    <div class="event-chip event-urgent">Server Maintenance</div>
-                </div>
-
-                <!-- Day 19 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">19</div>
-                </div>
-
-                <!-- Day 20 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">20</div>
-                    <div class="event-chip event-task">Code Review</div>
-                </div>
-
-                <!-- Day 21 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">21</div>
-                </div>
-
-                <!-- Day 22 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">22</div>
-                </div>
-
-                <!-- Day 23 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">23</div>
-                    <div class="event-chip event-meeting">Weekly Review</div>
-                </div>
-
-                <!-- Day 24 -->
-                <div class="calendar-day today">
-                    <div class="day-number text-sm mb-1">24</div>
-                    <div class="event-chip event-task">DB Migration</div>
-                    <div class="event-chip event-meeting">16:00 All Hands</div>
-                </div>
-
-                <!-- Day 25 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">25</div>
-                </div>
-
-                <!-- Day 26 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">26</div>
-                </div>
-
-                <!-- Day 27 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">27</div>
-                </div>
-
-                <!-- Day 28 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">28</div>
-                </div>
-
-                <!-- Day 29 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">29</div>
-                </div>
-
-                <!-- Day 30 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">30</div>
-                    <div class="event-chip event-task">Month End Report</div>
-                </div>
-
-                <!-- Day 31 -->
-                <div class="calendar-day">
-                    <div class="day-number text-sm mb-1">31</div>
-                    <div class="event-chip event-meeting">Halloween Party 🎃</div>
-                </div>
-
-                <!-- Next Month -->
-                <div class="calendar-day inactive">
-                    <div class="day-number text-sm">1</div>
-                </div>
-                 <div class="calendar-day inactive">
-                    <div class="day-number text-sm">2</div>
-                </div>
+                // Display previous month's trailing days
+                $trailingDays = $dayOfWeek;
+                for ($i = $trailingDays - 1; $i >= 0; $i--) {
+                    $day = $prevMonthDays - $i;
+                    echo '<div class="calendar-day inactive">';
+                    echo '<div class="day-number text-sm">' . $day . '</div>';
+                    echo '</div>';
+                }
+                
+                // Display current month's days
+                for ($day = 1; $day <= $daysInMonth; $day++) {
+                    $dateStr = sprintf('%04d-%02d-%02d', $year, $month, $day);
+                    $isToday = ($dateStr === $today);
+                    $dayTasks = $tasksByDate[$day] ?? [];
+                    
+                    $dayClasses = 'calendar-day';
+                    if ($isToday) {
+                        $dayClasses .= ' today';
+                    }
+                    
+                    echo '<div class="' . $dayClasses . '">';
+                    echo '<div class="day-number text-sm mb-1">' . $day . '</div>';
+                    
+                    // Display tasks for this day
+                    foreach ($dayTasks as $task) {
+                        $eventClass = getEventClass($task);
+                        $taskTitle = htmlspecialchars($task['name']);
+                        $priority = ucfirst($task['priority']);
+                        $status = ucfirst($task['status']);
+                        
+                        // Truncate long titles
+                        if (strlen($taskTitle) > 20) {
+                            $taskTitle = substr($taskTitle, 0, 17) . '...';
+                        }
+                        
+                        echo '<div class="event-chip ' . $eventClass . '" title="' . htmlspecialchars($task['name']) . ' (' . $priority . ' Priority, ' . $status . ')" onclick="showTaskDetails(' . $task['id'] . ')">';
+                        echo $taskTitle;
+                        echo '</div>';
+                    }
+                    
+                    echo '</div>';
+                }
+                
+                // Display next month's leading days
+                $totalCells = $trailingDays + $daysInMonth;
+                $remainingCells = 42 - $totalCells; // 6 rows * 7 days = 42
+                if ($remainingCells > 0) {
+                    for ($day = 1; $day <= $remainingCells; $day++) {
+                        echo '<div class="calendar-day inactive">';
+                        echo '<div class="day-number text-sm">' . $day . '</div>';
+                        echo '</div>';
+                    }
+                }
+                ?>
             </div>
         </div>
     </main>
@@ -435,48 +395,60 @@
     <div id="addEventModal" class="fixed inset-0 z-50 hidden">
         <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeModal()"></div>
         <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-lg p-6 rounded-2xl glass-panel border border-white/10 shadow-2xl">
-            <h2 class="text-2xl font-bold mb-6 text-white">Add New Event</h2>
-            <form>
+            <h2 class="text-2xl font-bold mb-6 text-white">Add New Task</h2>
+            <form id="eventForm" onsubmit="handleEventSubmit(event)">
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-sm text-gray-400 mb-1">Event Title</label>
-                        <input type="text" class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-cyan-500 outline-none" placeholder="e.g. Project Sync">
+                        <label class="block text-sm text-gray-400 mb-1">Task Title *</label>
+                        <input type="text" name="name" required class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-cyan-500 outline-none" placeholder="e.g. Project Sync">
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm text-gray-400 mb-1">Type</label>
-                            <select class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white outline-none">
-                                <option>Meeting</option>
-                                <option>Task</option>
-                                <option>Urgent</option>
-                                <option>Personal</option>
+                            <label class="block text-sm text-gray-400 mb-1">Priority</label>
+                            <select name="priority" class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white outline-none">
+                                <option value="low">Low</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="high">High</option>
                             </select>
                         </div>
                         <div>
-                            <label class="block text-sm text-gray-400 mb-1">Date</label>
-                            <input type="date" class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white outline-none">
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm text-gray-400 mb-1">Start Time</label>
-                            <input type="time" class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-sm text-gray-400 mb-1">End Time</label>
-                            <input type="time" class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white outline-none">
+                            <label class="block text-sm text-gray-400 mb-1">Due Date *</label>
+                            <input type="date" name="due_date" required class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white outline-none" value="<?php echo date('Y-m-d'); ?>">
                         </div>
                     </div>
                     <div>
+                        <label class="block text-sm text-gray-400 mb-1">Project (Optional)</label>
+                        <select name="project_id" class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white outline-none">
+                            <option value="">No Project</option>
+                            <?php foreach ($projects as $project): ?>
+                            <option value="<?php echo $project['id']; ?>"><?php echo htmlspecialchars($project['name']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div>
                         <label class="block text-sm text-gray-400 mb-1">Description</label>
-                        <textarea class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white h-24 outline-none" placeholder="Add details or meeting link..."></textarea>
+                        <textarea name="description" class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white h-24 outline-none" placeholder="Add details..."></textarea>
                     </div>
                     <div class="pt-4 flex justify-end gap-3">
                         <button type="button" class="px-4 py-2 rounded-lg text-gray-300 hover:text-white hover:bg-white/5" onclick="closeModal()">Cancel</button>
-                        <button type="button" class="px-6 py-2 rounded-lg bg-cyan-500 text-black font-bold hover:bg-cyan-400">Save Event</button>
+                        <button type="submit" class="px-6 py-2 rounded-lg bg-cyan-500 text-black font-bold hover:bg-cyan-400">Save Task</button>
                     </div>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Task Details Modal -->
+    <div id="taskDetailsModal" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeTaskDetails()"></div>
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-lg p-6 rounded-2xl glass-panel border border-white/10 shadow-2xl">
+            <h2 class="text-2xl font-bold mb-6 text-white">Task Details</h2>
+            <div id="taskDetailsContent" class="space-y-4">
+                <!-- Content will be loaded via AJAX -->
+            </div>
+            <div class="pt-4 flex justify-end">
+                <button type="button" class="px-4 py-2 rounded-lg text-gray-300 hover:text-white hover:bg-white/5" onclick="closeTaskDetails()">Close</button>
+            </div>
         </div>
     </div>
 
@@ -503,9 +475,76 @@
         // Modal Functions
         function openModal() {
             document.getElementById('addEventModal').classList.remove('hidden');
+            lucide.createIcons();
         }
+        
         function closeModal() {
             document.getElementById('addEventModal').classList.add('hidden');
+            document.getElementById('eventForm').reset();
+        }
+
+        // Handle Event Form Submission
+        function handleEventSubmit(event) {
+            event.preventDefault();
+            
+            const formData = new FormData(event.target);
+            formData.append('action', 'create_task');
+            formData.append('assigned_to', '<?php echo $userId; ?>');
+            formData.append('status', 'pending');
+            
+            // Convert project_id to null if empty
+            const projectId = formData.get('project_id');
+            if (!projectId) {
+                formData.set('project_id', '');
+            }
+            
+            fetch('api.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Task created successfully!');
+                    closeModal();
+                    // Reload page to show new task
+                    window.location.reload();
+                } else {
+                    alert('Error: ' + (data.message || 'Failed to create task'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to create task. Please try again.');
+            });
+        }
+
+        // Show Task Details
+        function showTaskDetails(taskId) {
+            // Fetch task details
+            fetch(`tasks.php?task_id=${taskId}`)
+                .then(response => response.text())
+                .then(html => {
+                    // For now, just show a simple message
+                    // In a full implementation, you'd fetch task details via API
+                    document.getElementById('taskDetailsContent').innerHTML = `
+                        <p class="text-gray-400">Task ID: ${taskId}</p>
+                        <p class="text-white">Click "My Tasks" to view full task details.</p>
+                    `;
+                    document.getElementById('taskDetailsModal').classList.remove('hidden');
+                    lucide.createIcons();
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('taskDetailsContent').innerHTML = `
+                        <p class="text-red-400">Error loading task details.</p>
+                    `;
+                    document.getElementById('taskDetailsModal').classList.remove('hidden');
+                });
+        }
+
+        function closeTaskDetails() {
+            document.getElementById('taskDetailsModal').classList.add('hidden');
         }
     </script>
 </body>

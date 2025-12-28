@@ -254,16 +254,16 @@ try {
 
         <!-- User Profile (Bottom) - Active State -->
         <div class="p-4 border-t border-white/5">
-            <div class="flex items-center gap-3 p-3 rounded-xl bg-white/10 border border-white/5 cursor-pointer transition-colors">
+            <a href="profile.php" class="flex items-center gap-3 p-3 rounded-xl bg-white/10 border border-white/5 cursor-pointer transition-colors hover:bg-white/15">
                 <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-500 to-cyan-500 p-[2px]">
-                    <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100&auto=format&fit=crop" class="w-full h-full rounded-full object-cover border-2 border-[#050510]" alt="User">
+                    <img src="<?php echo htmlspecialchars($avatarUrl); ?>" class="w-full h-full rounded-full object-cover border-2 border-[#050510]" alt="User">
                 </div>
                 <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-white truncate">Alex Morgan</p>
-                    <p class="text-xs text-gray-400 truncate">Pro Member</p>
+                    <p class="text-sm font-medium text-white truncate"><?php echo htmlspecialchars($userData['full_name']); ?></p>
+                    <p class="text-xs text-gray-400 truncate"><?php echo ucfirst($userData['role']); ?></p>
                 </div>
                 <i data-lucide="settings" class="w-4 h-4 text-cyan-400"></i>
-            </div>
+            </a>
         </div>
     </aside>
 
@@ -283,7 +283,7 @@ try {
                  <button class="p-2 rounded-full hover:bg-white/5 text-gray-400 hover:text-white transition-colors">
                     <i data-lucide="bell" class="w-5 h-5"></i>
                 </button>
-                <a href="login.php" class="flex items-center gap-2 text-sm text-red-400 hover:text-red-300 font-medium px-4 py-2 rounded-lg hover:bg-red-400/10 transition-colors">
+                <a href="logout.php" class="flex items-center gap-2 text-sm text-red-400 hover:text-red-300 font-medium px-4 py-2 rounded-lg hover:bg-red-400/10 transition-colors">
                     <i data-lucide="log-out" class="w-4 h-4"></i>
                     Sign Out
                 </a>
@@ -292,6 +292,17 @@ try {
 
         <!-- Profile Content -->
         <div class="flex-1 overflow-y-auto p-6">
+            
+            <!-- Message Display -->
+            <?php if ($message): ?>
+            <div class="max-w-6xl mx-auto mb-6">
+                <div class="glass-panel rounded-xl p-4 border <?php echo $messageType === 'success' ? 'border-green-500/30 bg-green-500/10' : 'border-red-500/30 bg-red-500/10'; ?>">
+                    <p class="text-sm <?php echo $messageType === 'success' ? 'text-green-400' : 'text-red-400'; ?>">
+                        <?php echo htmlspecialchars($message); ?>
+                    </p>
+                </div>
+            </div>
+            <?php endif; ?>
             
             <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
                 
@@ -304,7 +315,7 @@ try {
                         
                         <div class="relative mb-4 avatar-group cursor-pointer group">
                             <div class="w-32 h-32 rounded-full p-1 bg-gradient-to-tr from-cyan-400 to-purple-600">
-                                <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=400&auto=format&fit=crop" class="w-full h-full rounded-full object-cover border-4 border-[#050510]" alt="User">
+                                <img src="<?php echo htmlspecialchars($avatarUrl); ?>" class="w-full h-full rounded-full object-cover border-4 border-[#050510]" alt="User">
                             </div>
                             <div class="absolute inset-0 rounded-full flex items-center justify-center avatar-overlay">
                                 <i data-lucide="camera" class="w-8 h-8 text-white"></i>
@@ -312,16 +323,16 @@ try {
                             <div class="absolute bottom-1 right-1 w-6 h-6 bg-green-500 border-4 border-[#050510] rounded-full"></div>
                         </div>
                         
-                        <h2 class="text-2xl font-bold text-white mb-1">Alex Morgan</h2>
-                        <p class="text-cyan-400 font-medium mb-6">Senior Product Designer</p>
+                        <h2 class="text-2xl font-bold text-white mb-1"><?php echo htmlspecialchars($userData['full_name']); ?></h2>
+                        <p class="text-cyan-400 font-medium mb-6"><?php echo htmlspecialchars($roleTitle . ' - ' . $department); ?></p>
                         
                         <div class="flex gap-4 w-full mb-6">
                             <div class="flex-1 bg-white/5 rounded-xl p-3">
-                                <div class="text-2xl font-bold text-white">124</div>
+                                <div class="text-2xl font-bold text-white"><?php echo $taskCount; ?></div>
                                 <div class="text-xs text-gray-400 uppercase tracking-wider">Tasks</div>
                             </div>
                             <div class="flex-1 bg-white/5 rounded-xl p-3">
-                                <div class="text-2xl font-bold text-white">12</div>
+                                <div class="text-2xl font-bold text-white"><?php echo $projectCount; ?></div>
                                 <div class="text-xs text-gray-400 uppercase tracking-wider">Projects</div>
                             </div>
                         </div>
@@ -329,15 +340,17 @@ try {
                         <div class="w-full space-y-3">
                             <div class="flex items-center gap-3 text-sm text-gray-400">
                                 <i data-lucide="mail" class="w-4 h-4 text-gray-500"></i>
-                                alex.morgan@taskflow.com
+                                <?php echo htmlspecialchars($userData['email']); ?>
                             </div>
+                            <?php if ($userData['phone']): ?>
                             <div class="flex items-center gap-3 text-sm text-gray-400">
-                                <i data-lucide="map-pin" class="w-4 h-4 text-gray-500"></i>
-                                San Francisco, CA
+                                <i data-lucide="phone" class="w-4 h-4 text-gray-500"></i>
+                                <?php echo htmlspecialchars($userData['phone']); ?>
                             </div>
+                            <?php endif; ?>
                             <div class="flex items-center gap-3 text-sm text-gray-400">
                                 <i data-lucide="calendar-days" class="w-4 h-4 text-gray-500"></i>
-                                Joined March 2021
+                                Joined <?php echo htmlspecialchars($joinDate); ?>
                             </div>
                         </div>
                     </div>
@@ -374,36 +387,37 @@ try {
 
                         <!-- Content Area -->
                         <div class="p-8">
-                            <form>
+                            <form method="POST" action="">
+                                <input type="hidden" name="update_profile" value="1">
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                                     <div>
                                         <label class="block text-sm text-gray-400 mb-2">First Name</label>
-                                        <input type="text" value="Alex" class="w-full rounded-lg px-4 py-3 glass-input text-sm focus:ring-0">
+                                        <input type="text" name="first_name" value="<?php echo htmlspecialchars($firstName); ?>" required class="w-full rounded-lg px-4 py-3 glass-input text-sm focus:ring-0">
                                     </div>
                                     <div>
                                         <label class="block text-sm text-gray-400 mb-2">Last Name</label>
-                                        <input type="text" value="Morgan" class="w-full rounded-lg px-4 py-3 glass-input text-sm focus:ring-0">
+                                        <input type="text" name="last_name" value="<?php echo htmlspecialchars($lastName); ?>" required class="w-full rounded-lg px-4 py-3 glass-input text-sm focus:ring-0">
                                     </div>
                                     <div>
                                         <label class="block text-sm text-gray-400 mb-2">Email Address</label>
-                                        <input type="email" value="alex.morgan@taskflow.com" class="w-full rounded-lg px-4 py-3 glass-input text-sm focus:ring-0">
+                                        <input type="email" name="email" value="<?php echo htmlspecialchars($userData['email']); ?>" required class="w-full rounded-lg px-4 py-3 glass-input text-sm focus:ring-0">
                                     </div>
                                     <div>
                                         <label class="block text-sm text-gray-400 mb-2">Phone Number</label>
-                                        <input type="tel" value="+1 (555) 123-4567" class="w-full rounded-lg px-4 py-3 glass-input text-sm focus:ring-0">
+                                        <input type="tel" name="phone" value="<?php echo htmlspecialchars($userData['phone'] ?? ''); ?>" class="w-full rounded-lg px-4 py-3 glass-input text-sm focus:ring-0">
                                     </div>
                                 </div>
 
                                 <div class="mb-6">
                                     <label class="block text-sm text-gray-400 mb-2">Bio</label>
-                                    <textarea class="w-full rounded-lg px-4 py-3 glass-input text-sm h-32 focus:ring-0 resize-none">Passionate about creating intuitive user experiences and bridging the gap between design and engineering.</textarea>
+                                    <textarea name="bio" class="w-full rounded-lg px-4 py-3 glass-input text-sm h-32 focus:ring-0 resize-none"><?php echo htmlspecialchars($userData['bio'] ?? ''); ?></textarea>
                                 </div>
 
                                 <div class="mb-8">
                                     <label class="block text-sm text-gray-400 mb-2">Role & Department</label>
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <input type="text" value="Senior Product Designer" disabled class="w-full rounded-lg px-4 py-3 glass-input text-sm opacity-60 cursor-not-allowed">
-                                        <input type="text" value="Design Team" disabled class="w-full rounded-lg px-4 py-3 glass-input text-sm opacity-60 cursor-not-allowed">
+                                        <input type="text" value="<?php echo htmlspecialchars($roleTitle); ?>" disabled class="w-full rounded-lg px-4 py-3 glass-input text-sm opacity-60 cursor-not-allowed">
+                                        <input type="text" value="<?php echo htmlspecialchars($department); ?>" disabled class="w-full rounded-lg px-4 py-3 glass-input text-sm opacity-60 cursor-not-allowed">
                                     </div>
                                     <p class="text-xs text-gray-500 mt-2 flex items-center gap-1">
                                         <i data-lucide="lock" class="w-3 h-3"></i> Contact admin to change role details
@@ -411,7 +425,7 @@ try {
                                 </div>
 
                                 <div class="flex items-center justify-end gap-4 pt-6 border-t border-white/5">
-                                    <button type="button" class="px-6 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-colors">Cancel</button>
+                                    <button type="button" onclick="location.reload()" class="px-6 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-colors">Cancel</button>
                                     <button type="submit" class="px-6 py-2.5 rounded-lg text-sm font-bold bg-cyan-500 text-black hover:bg-cyan-400 shadow-[0_0_15px_rgba(0,243,255,0.3)] transition-all">Save Changes</button>
                                 </div>
                             </form>
