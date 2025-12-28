@@ -92,33 +92,33 @@
     <!-- Sidebar -->
     <aside id="sidebar" class="fixed inset-y-0 left-0 z-30 w-64 glass-panel border-r border-r-white/5 transform -translate-x-full lg:translate-x-0 lg:static lg:inset-auto flex flex-col sidebar bg-[#050510]">
         <!-- Brand -->
-        <div class="flex items-center justify-center h-20 border-b border-white/5">
+        <a href="dashboard.php" class="flex items-center justify-center h-20 border-b border-white/5 cursor-pointer">
             <div class="flex items-center gap-2">
                 <div class="w-8 h-8 rounded bg-gradient-to-br from-cyan-400 to-purple-600 flex items-center justify-center font-bold text-white">T</div>
                 <span class="font-bold text-xl tracking-wider text-white">Task<span class="text-cyan-400">Flow</span></span>
             </div>
-        </div>
+        </a>
 
         <!-- Nav Links -->
         <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-            <a href="dashboard.html" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+            <a href="dashboard.php" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
                 <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
                 <span class="font-medium">Dashboard</span>
             </a>
-            <a href="tasks.html" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+            <a href="tasks.php" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
                 <i data-lucide="check-square" class="w-5 h-5"></i>
                 <span class="font-medium">My Tasks</span>
             </a>
-            <a href="projects.html" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+            <a href="projects.php" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
                 <i data-lucide="folder-kanban" class="w-5 h-5"></i>
                 <span class="font-medium">Projects</span>
             </a>
-            <a href="#" class="flex items-center gap-3 px-4 py-3 text-cyan-400 bg-cyan-400/10 rounded-xl border border-cyan-400/20 transition-all">
+            <a href="team.php" class="flex items-center gap-3 px-4 py-3 text-cyan-400 bg-cyan-400/10 rounded-xl border border-cyan-400/20 transition-all">
                 <i data-lucide="users" class="w-5 h-5"></i>
                 <span class="font-medium">Team</span>
                 <span class="ml-auto text-xs bg-white/10 px-2 py-1 rounded-full text-white">8</span>
             </a>
-            <a href="#" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+            <a href="calender.php" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
                 <i data-lucide="calendar" class="w-5 h-5"></i>
                 <span class="font-medium">Calendar</span>
             </a>
@@ -126,7 +126,7 @@
 
         <!-- User Profile (Bottom) -->
         <div class="p-4 border-t border-white/5">
-            <div class="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 cursor-pointer transition-colors">
+            <a href="profile.php" class="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 cursor-pointer transition-colors">
                 <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-500 to-cyan-500 p-[2px]">
                     <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100&auto=format&fit=crop" class="w-full h-full rounded-full object-cover border-2 border-[#050510]" alt="User">
                 </div>
@@ -134,8 +134,10 @@
                     <p class="text-sm font-medium text-white truncate">Alex Morgan</p>
                     <p class="text-xs text-gray-400 truncate">Pro Member</p>
                 </div>
-                <i data-lucide="log-out" class="w-4 h-4 text-gray-500 hover:text-red-400 transition-colors"></i>
-            </div>
+                <a href="login.php" class="text-gray-500 hover:text-red-400 transition-colors">
+                    <i data-lucide="log-out" class="w-4 h-4"></i>
+                </a>
+            </a>
         </div>
     </aside>
 

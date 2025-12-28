@@ -105,32 +105,32 @@
     <!-- Sidebar -->
     <aside id="sidebar" class="fixed inset-y-0 left-0 z-30 w-64 glass-panel border-r border-r-white/5 transform -translate-x-full lg:translate-x-0 lg:static lg:inset-auto flex flex-col sidebar bg-[#050510]">
         <!-- Brand -->
-        <div class="flex items-center justify-center h-20 border-b border-white/5">
+        <a href="dashboard.php" class="flex items-center justify-center h-20 border-b border-white/5 cursor-pointer">
             <div class="flex items-center gap-2">
                 <div class="w-8 h-8 rounded bg-gradient-to-br from-cyan-400 to-purple-600 flex items-center justify-center font-bold text-white">T</div>
                 <span class="font-bold text-xl tracking-wider text-white">Task<span class="text-cyan-400">Flow</span></span>
             </div>
-        </div>
+        </a>
 
         <!-- Nav Links -->
         <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-            <a href="dashboard.html" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+            <a href="dashboard.php" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
                 <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
                 <span class="font-medium">Dashboard</span>
             </a>
-            <a href="tasks.html" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+            <a href="tasks.php" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
                 <i data-lucide="check-square" class="w-5 h-5"></i>
                 <span class="font-medium">My Tasks</span>
             </a>
-            <a href="projects.html" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+            <a href="projects.php" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
                 <i data-lucide="folder-kanban" class="w-5 h-5"></i>
                 <span class="font-medium">Projects</span>
             </a>
-            <a href="team.html" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+            <a href="team.php" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
                 <i data-lucide="users" class="w-5 h-5"></i>
                 <span class="font-medium">Team</span>
             </a>
-            <a href="calendar.html" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+            <a href="calender.php" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
                 <i data-lucide="calendar" class="w-5 h-5"></i>
                 <span class="font-medium">Calendar</span>
             </a>
@@ -167,7 +167,7 @@
                  <button class="p-2 rounded-full hover:bg-white/5 text-gray-400 hover:text-white transition-colors">
                     <i data-lucide="bell" class="w-5 h-5"></i>
                 </button>
-                <a href="login.html" class="flex items-center gap-2 text-sm text-red-400 hover:text-red-300 font-medium px-4 py-2 rounded-lg hover:bg-red-400/10 transition-colors">
+                <a href="login.php" class="flex items-center gap-2 text-sm text-red-400 hover:text-red-300 font-medium px-4 py-2 rounded-lg hover:bg-red-400/10 transition-colors">
                     <i data-lucide="log-out" class="w-4 h-4"></i>
                     Sign Out
                 </a>
