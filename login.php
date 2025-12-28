@@ -119,14 +119,14 @@
                 <p class="text-gray-400">Enter your credentials to access your account.</p>
             </div>
 
-            <form action="#" method="POST" class="space-y-6">
+            <form action="dashboard.php" method="POST" class="space-y-6">
                 
                 <!-- Email -->
                 <div>
                     <label class="block text-sm font-medium text-gray-400 mb-2">Email Address</label>
                     <div class="relative">
                         <i data-lucide="mail" class="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500"></i>
-                        <input type="email" placeholder="john@example.com" class="w-full pl-12 pr-4 py-3 rounded-xl glass-input text-white placeholder-gray-600 focus:ring-0">
+                        <input type="email" name="email" placeholder="john@example.com" class="w-full pl-12 pr-4 py-3 rounded-xl glass-input text-white placeholder-gray-600 focus:ring-0" required>
                     </div>
                 </div>
 
@@ -138,20 +138,20 @@
                     </div>
                     <div class="relative">
                         <i data-lucide="lock" class="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500"></i>
-                        <input type="password" placeholder="••••••••" class="w-full pl-12 pr-4 py-3 rounded-xl glass-input text-white placeholder-gray-600 focus:ring-0">
+                        <input type="password" name="password" placeholder="••••••••" class="w-full pl-12 pr-4 py-3 rounded-xl glass-input text-white placeholder-gray-600 focus:ring-0" required>
                     </div>
                 </div>
 
                 <!-- Remember Me -->
                 <div class="flex items-center">
-                    <input id="remember" type="checkbox" class="h-4 w-4 rounded border-gray-600 bg-gray-700 text-cyan-500 focus:ring-cyan-500/20">
+                    <input id="remember" type="checkbox" name="remember" class="h-4 w-4 rounded border-gray-600 bg-gray-700 text-cyan-500 focus:ring-cyan-500/20">
                     <label for="remember" class="ml-2 block text-sm text-gray-400">
                         Remember me for 30 days
                     </label>
                 </div>
 
                 <!-- Submit Button -->
-                <button type="button" class="w-full py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold text-lg btn-glow shadow-lg shadow-cyan-500/20 mt-4">
+                <button type="submit" class="w-full py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold text-lg btn-glow shadow-lg shadow-cyan-500/20 mt-4">
                     Sign In
                 </button>
             </form>
