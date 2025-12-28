@@ -87,6 +87,41 @@
             background: rgba(0,0,0,0.5);
             backdrop-filter: blur(4px);
         }
+
+        /* Modal Styles */
+        .modal-overlay {
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+        }
+        
+        .modal-content {
+            animation: slideUp 0.3s ease-out;
+        }
+        
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .glass-input {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            transition: all 0.3s ease;
+        }
+        
+        .glass-input:focus {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--primary);
+            outline: none;
+            box-shadow: 0 0 10px rgba(0, 243, 255, 0.1);
+        }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden">
@@ -170,7 +205,7 @@
                     <span class="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full border border-[#050510]"></span>
                 </button>
                 
-                <button class="bg-gradient-to-r from-cyan-500 to-blue-600 text-white px-4 py-2 rounded-lg font-medium text-sm hover:shadow-[0_0_15px_rgba(0,243,255,0.3)] transition-all flex items-center gap-2">
+                <button onclick="openTaskModal()" class="bg-gradient-to-r from-cyan-500 to-blue-600 text-white px-4 py-2 rounded-lg font-medium text-sm hover:shadow-[0_0_15px_rgba(0,243,255,0.3)] transition-all flex items-center gap-2">
                     <i data-lucide="plus" class="w-4 h-4"></i>
                     <span class="hidden sm:inline">New Task</span>
                 </button>
@@ -344,6 +379,74 @@
         </div>
     </main>
 
+    <!-- New Task Modal -->
+    <div id="taskModal" class="fixed inset-0 z-50 modal-overlay hidden flex items-center justify-center p-4">
+        <div class="modal-content glass-panel rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold text-white">Create New Task</h2>
+                <button onclick="closeTaskModal()" class="text-gray-400 hover:text-white transition-colors">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <form id="taskForm" onsubmit="handleTaskSubmit(event)" class="space-y-4">
+                <!-- Task Name -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Task Name *</label>
+                    <input type="text" name="taskName" required class="w-full px-4 py-3 rounded-xl glass-input text-white placeholder-gray-500" placeholder="Enter task name">
+                </div>
+
+                <!-- Description -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Description</label>
+                    <textarea name="description" rows="3" class="w-full px-4 py-3 rounded-xl glass-input text-white placeholder-gray-500 resize-none" placeholder="Add task description..."></textarea>
+                </div>
+
+                <!-- Priority and Status -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-2">Priority *</label>
+                        <select name="priority" required class="w-full px-4 py-3 rounded-xl glass-input text-white">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-2">Status *</label>
+                        <select name="status" required class="w-full px-4 py-3 rounded-xl glass-input text-white">
+                            <option value="pending" selected>Pending</option>
+                            <option value="progress">In Progress</option>
+                            <option value="done">Done</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Due Date -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Due Date</label>
+                    <input type="date" name="dueDate" class="w-full px-4 py-3 rounded-xl glass-input text-white">
+                </div>
+
+                <!-- Project/Category (Optional) -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Project/Category</label>
+                    <input type="text" name="project" class="w-full px-4 py-3 rounded-xl glass-input text-white placeholder-gray-500" placeholder="Optional project name">
+                </div>
+
+                <!-- Form Actions -->
+                <div class="flex gap-3 pt-4">
+                    <button type="button" onclick="closeTaskModal()" class="flex-1 px-4 py-3 rounded-xl glass-panel text-gray-300 hover:text-white hover:bg-white/10 transition-all font-medium">
+                        Cancel
+                    </button>
+                    <button type="submit" class="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-medium hover:shadow-[0_0_15px_rgba(0,243,255,0.3)] transition-all">
+                        Create Task
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script>
         // Initialize Icons
@@ -428,6 +531,65 @@
                 }
             }
         });
+
+        // Task Modal Functions
+        function openTaskModal() {
+            const modal = document.getElementById('taskModal');
+            if (modal) {
+                modal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+                lucide.createIcons(); // Reinitialize icons for modal
+            }
+        }
+
+        function closeTaskModal() {
+            const modal = document.getElementById('taskModal');
+            if (modal) {
+                modal.classList.add('hidden');
+                document.body.style.overflow = 'auto';
+                const form = document.getElementById('taskForm');
+                if (form) {
+                    form.reset();
+                }
+            }
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('DOMContentLoaded', function() {
+            const modal = document.getElementById('taskModal');
+            if (modal) {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === this) {
+                        closeTaskModal();
+                    }
+                });
+            }
+        });
+
+        // Handle form submission
+        function handleTaskSubmit(event) {
+            event.preventDefault();
+            
+            const formData = new FormData(event.target);
+            const taskData = {
+                taskName: formData.get('taskName'),
+                description: formData.get('description'),
+                priority: formData.get('priority'),
+                status: formData.get('status'),
+                dueDate: formData.get('dueDate'),
+                project: formData.get('project')
+            };
+
+            // Here you would normally send this to a backend API
+            // For now, we'll just show a success message and close the modal
+            console.log('New Task Created:', taskData);
+            
+            // Show success notification
+            alert('Task "' + taskData.taskName + '" created successfully!');
+            
+            // Close modal and reset form
+            closeTaskModal();
+        }
     </script>
 </body>
 </html>
