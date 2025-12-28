@@ -151,6 +151,7 @@
                         <a href="#features" class="hover:text-cyan-400 text-gray-300 px-3 py-2 rounded-md text-sm font-medium transition-colors">Features</a>
                         <a href="#tech" class="hover:text-cyan-400 text-gray-300 px-3 py-2 rounded-md text-sm font-medium transition-colors">Tech Stack</a>
                         <a href="#pricing" class="hover:text-cyan-400 text-gray-300 px-3 py-2 rounded-md text-sm font-medium transition-colors">Pricing</a>
+                        <a href="login.php" class="hover:text-cyan-400 text-gray-300 px-3 py-2 rounded-md text-sm font-medium transition-colors">Log In</a>
                         <a href="signup.php" class="bg-cyan-500 hover:bg-cyan-600 text-black font-bold px-5 py-2 rounded-full text-sm transition-all btn-glow">Get Started</a>
                     </div>
                 </div>
@@ -170,6 +171,7 @@
             <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
                 <a href="#features" class="text-gray-300 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Features</a>
                 <a href="#tech" class="text-gray-300 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Tech Stack</a>
+                <a href="login.php" class="text-gray-300 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Log In</a>
                 <a href="signup.php" class="bg-cyan-500 text-black block px-3 py-2 rounded-md text-base font-medium mt-4">Get Started</a>
             </div>
         </div>

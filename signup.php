@@ -81,10 +81,10 @@
 
         <!-- Content over image -->
         <div class="relative z-10 w-full flex flex-col justify-between p-12">
-            <div class="flex items-center gap-2">
+            <a href="index.php" class="flex items-center gap-2 cursor-pointer">
                 <div class="w-8 h-8 rounded bg-gradient-to-br from-cyan-400 to-purple-600 flex items-center justify-center font-bold text-white">T</div>
                 <span class="font-bold text-xl tracking-wider text-white">Task<span class="text-cyan-400">Flow</span></span>
-            </div>
+            </a>
 
             <div class="mb-12">
                 <h2 class="text-4xl font-bold mb-6">Join the <br><span class="text-cyan-400">Future of Work.</span></h2>
@@ -124,10 +124,10 @@
 
         <div class="max-w-md w-full relative z-10">
             <!-- Mobile Logo -->
-            <div class="lg:hidden flex items-center justify-center gap-2 mb-8">
+            <a href="index.php" class="lg:hidden flex items-center justify-center gap-2 mb-8 cursor-pointer">
                 <div class="w-8 h-8 rounded bg-gradient-to-br from-cyan-400 to-purple-600 flex items-center justify-center font-bold text-white">T</div>
                 <span class="font-bold text-xl tracking-wider text-white">Task<span class="text-cyan-400">Flow</span></span>
-            </div>
+            </a>
 
             <div class="text-center mb-10">
                 <h1 class="text-3xl font-bold mb-2">Create Account</h1>
