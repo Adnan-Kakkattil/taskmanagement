@@ -1,3 +1,114 @@
+<?php
+require_once 'config.php';
+requireLogin();
+$currentUser = getCurrentUser();
+$userId = getCurrentUserId();
+
+$pdo = getDBConnection();
+$error = '';
+$success = '';
+
+// Handle task creation
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'create_task') {
+    $name = trim($_POST['task_name'] ?? '');
+    $description = trim($_POST['description'] ?? '');
+    $priority = $_POST['priority'] ?? 'medium';
+    $due_date = $_POST['due_date'] ?? null;
+    $project_id = !empty($_POST['project_id']) ? (int)$_POST['project_id'] : null;
+    
+    if (empty($name)) {
+        $error = 'Task name is required';
+    } else {
+        try {
+            $stmt = $pdo->prepare("INSERT INTO tasks (name, description, priority, due_date, project_id, assigned_to, status, created_by) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)");
+            $stmt->execute([$name, $description, $priority, $due_date ?: null, $project_id, $userId, $userId]);
+            $success = 'Task created successfully!';
+            // Redirect to prevent form resubmission
+            header('Location: tasks.php');
+            exit;
+        } catch (PDOException $e) {
+            $error = 'Failed to create task. Please try again.';
+        }
+    }
+}
+
+// Handle task status update (for drag and drop)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_status') {
+    $task_id = (int)$_POST['task_id'];
+    $status = $_POST['status'];
+    
+    try {
+        $stmt = $pdo->prepare("UPDATE tasks SET status = ? WHERE id = ? AND assigned_to = ?");
+        $stmt->execute([$status, $task_id, $userId]);
+        echo json_encode(['success' => true]);
+        exit;
+    } catch (PDOException $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        exit;
+    }
+}
+
+// Fetch user's tasks
+$stmt = $pdo->prepare("
+    SELECT t.*, p.name as project_name 
+    FROM tasks t 
+    LEFT JOIN projects p ON t.project_id = p.id 
+    WHERE t.assigned_to = ? 
+    ORDER BY t.priority DESC, t.due_date ASC, t.created_at DESC
+");
+$stmt->execute([$userId]);
+$allTasks = $stmt->fetchAll();
+
+// Group tasks by status
+$tasksByStatus = [
+    'pending' => [],
+    'progress' => [],
+    'done' => []
+];
+
+foreach ($allTasks as $task) {
+    $tasksByStatus[$task['status']][] = $task;
+}
+
+// Get task counts
+$taskCounts = [
+    'pending' => count($tasksByStatus['pending']),
+    'progress' => count($tasksByStatus['progress']),
+    'done' => count($tasksByStatus['done']),
+    'total' => count($allTasks)
+];
+
+// Get projects for dropdown
+$projects = getAllProjects();
+
+// Helper function to format date
+function formatDate($date) {
+    if (!$date) return 'No date';
+    $timestamp = strtotime($date);
+    $today = strtotime('today');
+    $tomorrow = strtotime('tomorrow');
+    
+    if ($timestamp < $today) {
+        return date('M j', $timestamp);
+    } elseif ($timestamp == $today) {
+        return 'Today';
+    } elseif ($timestamp == $tomorrow) {
+        return 'Tomorrow';
+    } else {
+        return date('M j', $timestamp);
+    }
+}
+
+// Helper function to get priority color
+function getPriorityColor($priority) {
+    switch ($priority) {
+        case 'high': return 'text-red-400 bg-red-400/10';
+        case 'medium': return 'text-yellow-400 bg-yellow-400/10';
+        case 'low': return 'text-green-400 bg-green-400/10';
+        default: return 'text-gray-400 bg-gray-400/10';
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -115,7 +226,7 @@
             <a href="tasks.php" class="flex items-center gap-3 px-4 py-3 text-cyan-400 bg-cyan-400/10 rounded-xl border border-cyan-400/20 transition-all">
                 <i data-lucide="check-square" class="w-5 h-5"></i>
                 <span class="font-medium">My Tasks</span>
-                <span class="ml-auto text-xs bg-white/10 px-2 py-1 rounded-full text-white">12</span>
+                <span class="ml-auto text-xs bg-white/10 px-2 py-1 rounded-full text-white"><?php echo $taskCounts['total']; ?></span>
             </a>
             <a href="projects.php" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
                 <i data-lucide="folder-kanban" class="w-5 h-5"></i>
@@ -135,13 +246,13 @@
         <div class="p-4 border-t border-white/5">
             <a href="profile.php" class="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 cursor-pointer transition-colors">
                 <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-500 to-cyan-500 p-[2px]">
-                    <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100&auto=format&fit=crop" class="w-full h-full rounded-full object-cover border-2 border-[#050510]" alt="User">
+                    <img src="<?php echo htmlspecialchars($currentUser['avatar'] ?? 'https://api.dicebear.com/7.x/initials/svg?seed=' . urlencode($currentUser['full_name'])); ?>" class="w-full h-full rounded-full object-cover border-2 border-[#050510]" alt="User">
                 </div>
                 <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-white truncate">Alex Morgan</p>
-                    <p class="text-xs text-gray-400 truncate">Pro Member</p>
+                    <p class="text-sm font-medium text-white truncate"><?php echo htmlspecialchars($currentUser['full_name']); ?></p>
+                    <p class="text-xs text-gray-400 truncate"><?php echo ucfirst($currentUser['role']); ?></p>
                 </div>
-                <a href="login.php" class="text-gray-500 hover:text-red-400 transition-colors">
+                <a href="logout.php" class="text-gray-500 hover:text-red-400 transition-colors">
                     <i data-lucide="log-out" class="w-4 h-4"></i>
                 </a>
             </a>
@@ -178,22 +289,16 @@
         <div class="px-6 py-4 border-b border-white/5 flex flex-col sm:flex-row gap-4 justify-between items-center bg-[#050510]">
             <div class="relative w-full sm:w-auto">
                 <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500"></i>
-                <input type="text" placeholder="Filter tasks..." class="bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 w-full sm:w-64 transition-all">
+                <input type="text" id="searchInput" placeholder="Filter tasks..." class="bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 w-full sm:w-64 transition-all" onkeyup="filterTasks()">
             </div>
             
             <div class="flex items-center gap-3 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
                 <span class="text-xs text-gray-500 font-medium uppercase mr-2">Sort By:</span>
-                <select class="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-cyan-500">
-                    <option>Priority</option>
-                    <option>Due Date</option>
-                    <option>Created Date</option>
+                <select id="sortSelect" class="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-cyan-500" onchange="sortTasks()">
+                    <option value="priority">Priority</option>
+                    <option value="due_date">Due Date</option>
+                    <option value="created_at">Created Date</option>
                 </select>
-                <div class="h-6 w-px bg-white/10 mx-2"></div>
-                <div class="flex -space-x-2">
-                    <img class="w-8 h-8 rounded-full border-2 border-[#050510]" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&fit=crop" alt="User">
-                    <img class="w-8 h-8 rounded-full border-2 border-[#050510]" src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&fit=crop" alt="User">
-                    <div class="w-8 h-8 rounded-full border-2 border-[#050510] bg-gray-700 flex items-center justify-center text-xs text-white">+3</div>
-                </div>
             </div>
         </div>
 
@@ -208,44 +313,38 @@
                         <div class="flex items-center gap-2">
                             <div class="w-3 h-3 rounded-full bg-orange-400"></div>
                             <h3 class="font-bold text-gray-200">To Do</h3>
-                            <span class="bg-white/10 text-xs px-2 py-0.5 rounded text-gray-400">4</span>
+                            <span class="bg-white/10 text-xs px-2 py-0.5 rounded text-gray-400"><?php echo $taskCounts['pending']; ?></span>
                         </div>
-                        <button class="text-gray-500 hover:text-white"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                        <button class="text-gray-500 hover:text-white" onclick="openModal()"><i data-lucide="plus" class="w-4 h-4"></i></button>
                     </div>
                     
                     <!-- Draggable Area -->
-                    <div class="flex-1 p-4 overflow-y-auto space-y-3 kanban-column" id="todo" ondrop="drop(event)" ondragover="allowDrop(event)">
-                        
-                        <!-- Task Card 1 -->
-                        <div class="task-card glass-panel p-4 rounded-xl border border-white/5 hover:border-cyan-500/50 group" draggable="true" ondragstart="drag(event)" id="task-1">
+                    <div class="flex-1 p-4 overflow-y-auto space-y-3 kanban-column" id="todo" data-status="pending" ondrop="drop(event)" ondragover="allowDrop(event)">
+                        <?php foreach ($tasksByStatus['pending'] as $task): ?>
+                        <div class="task-card glass-panel p-4 rounded-xl border border-white/5 hover:border-cyan-500/50 group" draggable="true" ondragstart="drag(event)" id="task-<?php echo $task['id']; ?>" data-task-id="<?php echo $task['id']; ?>">
                             <div class="flex justify-between items-start mb-2">
-                                <span class="text-xs font-semibold text-red-400 bg-red-400/10 px-2 py-0.5 rounded">High</span>
+                                <span class="text-xs font-semibold <?php echo getPriorityColor($task['priority']); ?> px-2 py-0.5 rounded"><?php echo ucfirst($task['priority']); ?></span>
                                 <button class="text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"><i data-lucide="more-horizontal" class="w-4 h-4"></i></button>
                             </div>
-                            <h4 class="font-bold text-white mb-1">Database Schema Redesign</h4>
-                            <p class="text-sm text-gray-400 mb-3 line-clamp-2">Optimize the user tables for faster query performance on the dashboard.</p>
+                            <h4 class="font-bold text-white mb-1"><?php echo htmlspecialchars($task['name']); ?></h4>
+                            <?php if ($task['description']): ?>
+                            <p class="text-sm text-gray-400 mb-3 line-clamp-2"><?php echo htmlspecialchars($task['description']); ?></p>
+                            <?php endif; ?>
+                            <?php if ($task['project_name']): ?>
+                            <p class="text-xs text-cyan-400 mb-2"><i data-lucide="folder" class="w-3 h-3 inline"></i> <?php echo htmlspecialchars($task['project_name']); ?></p>
+                            <?php endif; ?>
                             <div class="flex items-center justify-between text-xs text-gray-500 mt-auto">
-                                <div class="flex items-center gap-1"><i data-lucide="calendar" class="w-3 h-3"></i> Oct 24</div>
-                                <div class="flex items-center gap-1"><i data-lucide="message-square" class="w-3 h-3"></i> 3</div>
+                                <?php if ($task['due_date']): ?>
+                                <div class="flex items-center gap-1"><i data-lucide="calendar" class="w-3 h-3"></i> <?php echo formatDate($task['due_date']); ?></div>
+                                <?php else: ?>
+                                <div></div>
+                                <?php endif; ?>
                             </div>
                         </div>
-
-                        <!-- Task Card 2 -->
-                        <div class="task-card glass-panel p-4 rounded-xl border border-white/5 hover:border-cyan-500/50 group" draggable="true" ondragstart="drag(event)" id="task-2">
-                            <div class="flex justify-between items-start mb-2">
-                                <span class="text-xs font-semibold text-green-400 bg-green-400/10 px-2 py-0.5 rounded">Low</span>
-                                <button class="text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"><i data-lucide="more-horizontal" class="w-4 h-4"></i></button>
-                            </div>
-                            <h4 class="font-bold text-white mb-1">Update dependencies</h4>
-                            <p class="text-sm text-gray-400 mb-3 line-clamp-2">Check npm audit and fix vulnerability warnings in the frontend repo.</p>
-                            <div class="flex items-center justify-between text-xs text-gray-500 mt-auto">
-                                <div class="flex items-center gap-1"><i data-lucide="calendar" class="w-3 h-3"></i> Oct 28</div>
-                                <div class="flex -space-x-1">
-                                    <div class="w-5 h-5 rounded-full bg-blue-500"></div>
-                                </div>
-                            </div>
-                        </div>
-
+                        <?php endforeach; ?>
+                        <?php if (empty($tasksByStatus['pending'])): ?>
+                        <div class="text-center text-gray-500 text-sm py-8">No tasks</div>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -255,50 +354,37 @@
                         <div class="flex items-center gap-2">
                             <div class="w-3 h-3 rounded-full bg-cyan-400"></div>
                             <h3 class="font-bold text-gray-200">In Progress</h3>
-                            <span class="bg-white/10 text-xs px-2 py-0.5 rounded text-gray-400">2</span>
+                            <span class="bg-white/10 text-xs px-2 py-0.5 rounded text-gray-400"><?php echo $taskCounts['progress']; ?></span>
                         </div>
-                        <button class="text-gray-500 hover:text-white"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                        <button class="text-gray-500 hover:text-white" onclick="openModal()"><i data-lucide="plus" class="w-4 h-4"></i></button>
                     </div>
                     
-                    <div class="flex-1 p-4 overflow-y-auto space-y-3 kanban-column" id="progress" ondrop="drop(event)" ondragover="allowDrop(event)">
-                        
-                        <!-- Task Card 3 -->
-                        <div class="task-card glass-panel p-4 rounded-xl border border-white/5 hover:border-cyan-500/50 group" draggable="true" ondragstart="drag(event)" id="task-3">
+                    <div class="flex-1 p-4 overflow-y-auto space-y-3 kanban-column" id="progress" data-status="progress" ondrop="drop(event)" ondragover="allowDrop(event)">
+                        <?php foreach ($tasksByStatus['progress'] as $task): ?>
+                        <div class="task-card glass-panel p-4 rounded-xl border border-white/5 hover:border-cyan-500/50 group" draggable="true" ondragstart="drag(event)" id="task-<?php echo $task['id']; ?>" data-task-id="<?php echo $task['id']; ?>">
                             <div class="flex justify-between items-start mb-2">
-                                <span class="text-xs font-semibold text-yellow-400 bg-yellow-400/10 px-2 py-0.5 rounded">Medium</span>
+                                <span class="text-xs font-semibold <?php echo getPriorityColor($task['priority']); ?> px-2 py-0.5 rounded"><?php echo ucfirst($task['priority']); ?></span>
                                 <button class="text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"><i data-lucide="more-horizontal" class="w-4 h-4"></i></button>
                             </div>
-                            <h4 class="font-bold text-white mb-1">API Authentication</h4>
-                            <p class="text-sm text-gray-400 mb-3 line-clamp-2">Implement JWT token refresh mechanism for the user session.</p>
-                            
-                            <!-- Progress Bar -->
-                            <div class="w-full bg-gray-700 h-1.5 rounded-full mb-3">
-                                <div class="bg-cyan-400 h-1.5 rounded-full" style="width: 60%"></div>
-                            </div>
-
+                            <h4 class="font-bold text-white mb-1"><?php echo htmlspecialchars($task['name']); ?></h4>
+                            <?php if ($task['description']): ?>
+                            <p class="text-sm text-gray-400 mb-3 line-clamp-2"><?php echo htmlspecialchars($task['description']); ?></p>
+                            <?php endif; ?>
+                            <?php if ($task['project_name']): ?>
+                            <p class="text-xs text-cyan-400 mb-2"><i data-lucide="folder" class="w-3 h-3 inline"></i> <?php echo htmlspecialchars($task['project_name']); ?></p>
+                            <?php endif; ?>
                             <div class="flex items-center justify-between text-xs text-gray-500 mt-auto">
-                                <div class="flex items-center gap-1"><i data-lucide="calendar" class="w-3 h-3"></i> Tomorrow</div>
-                                <div class="flex items-center gap-1"><i data-lucide="paperclip" class="w-3 h-3"></i> 2</div>
+                                <?php if ($task['due_date']): ?>
+                                <div class="flex items-center gap-1"><i data-lucide="calendar" class="w-3 h-3"></i> <?php echo formatDate($task['due_date']); ?></div>
+                                <?php else: ?>
+                                <div></div>
+                                <?php endif; ?>
                             </div>
                         </div>
-
-                         <!-- Task Card 4 -->
-                         <div class="task-card glass-panel p-4 rounded-xl border border-white/5 hover:border-cyan-500/50 group" draggable="true" ondragstart="drag(event)" id="task-4">
-                            <div class="flex justify-between items-start mb-2">
-                                <span class="text-xs font-semibold text-red-400 bg-red-400/10 px-2 py-0.5 rounded">High</span>
-                                <button class="text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"><i data-lucide="more-horizontal" class="w-4 h-4"></i></button>
-                            </div>
-                            <h4 class="font-bold text-white mb-1">Mobile Responsive Fixes</h4>
-                            <p class="text-sm text-gray-400 mb-3 line-clamp-2">Sidebar not collapsing correctly on iPhone 12 Safari.</p>
-                            <div class="flex items-center justify-between text-xs text-gray-500 mt-auto">
-                                <div class="flex items-center gap-1"><i data-lucide="calendar" class="w-3 h-3"></i> Today</div>
-                                <div class="flex -space-x-1">
-                                    <div class="w-5 h-5 rounded-full bg-purple-500"></div>
-                                    <div class="w-5 h-5 rounded-full bg-pink-500"></div>
-                                </div>
-                            </div>
-                        </div>
-
+                        <?php endforeach; ?>
+                        <?php if (empty($tasksByStatus['progress'])): ?>
+                        <div class="text-center text-gray-500 text-sm py-8">No tasks</div>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -308,26 +394,36 @@
                         <div class="flex items-center gap-2">
                             <div class="w-3 h-3 rounded-full bg-green-400"></div>
                             <h3 class="font-bold text-gray-200">Done</h3>
-                            <span class="bg-white/10 text-xs px-2 py-0.5 rounded text-gray-400">12</span>
+                            <span class="bg-white/10 text-xs px-2 py-0.5 rounded text-gray-400"><?php echo $taskCounts['done']; ?></span>
                         </div>
                         <button class="text-gray-500 hover:text-white"><i data-lucide="check" class="w-4 h-4"></i></button>
                     </div>
                     
-                    <div class="flex-1 p-4 overflow-y-auto space-y-3 kanban-column" id="done" ondrop="drop(event)" ondragover="allowDrop(event)">
-                        
-                        <!-- Task Card 5 -->
-                        <div class="task-card glass-panel p-4 rounded-xl border border-white/5 hover:border-cyan-500/50 opacity-70 group" draggable="true" ondragstart="drag(event)" id="task-5">
+                    <div class="flex-1 p-4 overflow-y-auto space-y-3 kanban-column" id="done" data-status="done" ondrop="drop(event)" ondragover="allowDrop(event)">
+                        <?php foreach ($tasksByStatus['done'] as $task): ?>
+                        <div class="task-card glass-panel p-4 rounded-xl border border-white/5 hover:border-cyan-500/50 opacity-70 group" draggable="true" ondragstart="drag(event)" id="task-<?php echo $task['id']; ?>" data-task-id="<?php echo $task['id']; ?>">
                             <div class="flex justify-between items-start mb-2">
-                                <span class="text-xs font-semibold text-green-400 bg-green-400/10 px-2 py-0.5 rounded">Low</span>
+                                <span class="text-xs font-semibold <?php echo getPriorityColor($task['priority']); ?> px-2 py-0.5 rounded"><?php echo ucfirst($task['priority']); ?></span>
                                 <button class="text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"><i data-lucide="more-horizontal" class="w-4 h-4"></i></button>
                             </div>
-                            <h4 class="font-bold text-gray-300 line-through mb-1">Setup Repo</h4>
-                            <p class="text-sm text-gray-500 mb-3 line-clamp-2">Initialize Git and configure .gitignore.</p>
+                            <h4 class="font-bold text-gray-300 line-through mb-1"><?php echo htmlspecialchars($task['name']); ?></h4>
+                            <?php if ($task['description']): ?>
+                            <p class="text-sm text-gray-500 mb-3 line-clamp-2"><?php echo htmlspecialchars($task['description']); ?></p>
+                            <?php endif; ?>
+                            <?php if ($task['project_name']): ?>
+                            <p class="text-xs text-cyan-400 mb-2"><i data-lucide="folder" class="w-3 h-3 inline"></i> <?php echo htmlspecialchars($task['project_name']); ?></p>
+                            <?php endif; ?>
                             <div class="flex items-center justify-between text-xs text-gray-500 mt-auto">
-                                <div class="flex items-center gap-1 text-green-400"><i data-lucide="check-circle-2" class="w-3 h-3"></i> Completed</div>
+                                <div class="flex items-center gap-1 text-green-400">
+                                    <i data-lucide="check-circle-2" class="w-3 h-3"></i> 
+                                    <?php echo $task['completed_at'] ? 'Completed ' . date('M j', strtotime($task['completed_at'])) : 'Completed'; ?>
+                                </div>
                             </div>
                         </div>
-
+                        <?php endforeach; ?>
+                        <?php if (empty($tasksByStatus['done'])): ?>
+                        <div class="text-center text-gray-500 text-sm py-8">No tasks</div>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -340,33 +436,48 @@
         <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeModal()"></div>
         <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-lg p-6 rounded-2xl glass-panel border border-white/10 shadow-2xl">
             <h2 class="text-2xl font-bold mb-6 text-white">New Task</h2>
-            <form>
+            <?php if ($error): ?>
+            <div class="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                <?php echo htmlspecialchars($error); ?>
+            </div>
+            <?php endif; ?>
+            <form method="POST" action="tasks.php" id="taskForm">
+                <input type="hidden" name="action" value="create_task">
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-sm text-gray-400 mb-1">Task Title</label>
-                        <input type="text" class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-cyan-500 outline-none" placeholder="e.g. Fix Navigation Bug">
+                        <label class="block text-sm text-gray-400 mb-1">Task Title *</label>
+                        <input type="text" name="task_name" required class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-cyan-500 outline-none" placeholder="e.g. Fix Navigation Bug">
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm text-gray-400 mb-1">Priority</label>
-                            <select class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white outline-none">
-                                <option>Low</option>
-                                <option>Medium</option>
-                                <option>High</option>
+                            <select name="priority" class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white outline-none">
+                                <option value="low">Low</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="high">High</option>
                             </select>
                         </div>
                         <div>
                             <label class="block text-sm text-gray-400 mb-1">Due Date</label>
-                            <input type="date" class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white outline-none">
+                            <input type="date" name="due_date" class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white outline-none">
                         </div>
                     </div>
                     <div>
+                        <label class="block text-sm text-gray-400 mb-1">Project (Optional)</label>
+                        <select name="project_id" class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white outline-none">
+                            <option value="">No Project</option>
+                            <?php foreach ($projects as $project): ?>
+                            <option value="<?php echo $project['id']; ?>"><?php echo htmlspecialchars($project['name']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div>
                         <label class="block text-sm text-gray-400 mb-1">Description</label>
-                        <textarea class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white h-24 outline-none" placeholder="Add details..."></textarea>
+                        <textarea name="description" class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white h-24 outline-none" placeholder="Add details..."></textarea>
                     </div>
                     <div class="pt-4 flex justify-end gap-3">
                         <button type="button" class="px-4 py-2 rounded-lg text-gray-300 hover:text-white hover:bg-white/5" onclick="closeModal()">Cancel</button>
-                        <button type="button" class="px-6 py-2 rounded-lg bg-cyan-500 text-black font-bold hover:bg-cyan-400">Create Task</button>
+                        <button type="submit" class="px-6 py-2 rounded-lg bg-cyan-500 text-black font-bold hover:bg-cyan-400">Create Task</button>
                     </div>
                 </div>
             </form>
@@ -396,15 +507,16 @@
         // Modal Functions
         function openModal() {
             document.getElementById('addTaskModal').classList.remove('hidden');
+            lucide.createIcons();
         }
         function closeModal() {
             document.getElementById('addTaskModal').classList.add('hidden');
+            document.getElementById('taskForm').reset();
         }
 
         // Drag and Drop Logic
         function allowDrop(ev) {
             ev.preventDefault();
-            // Optional: Add visual cue for drop target
             const column = ev.target.closest('.kanban-column');
             if(column) {
                 document.querySelectorAll('.kanban-column').forEach(c => c.classList.remove('drag-over'));
@@ -421,6 +533,7 @@
             ev.preventDefault();
             var data = ev.dataTransfer.getData("text");
             const draggedElement = document.getElementById(data);
+            const taskId = draggedElement.getAttribute('data-task-id');
             
             // Remove dragging styles
             draggedElement.classList.remove('dragging');
@@ -429,20 +542,92 @@
             // Find the closest column content area
             const dropTarget = ev.target.closest('.kanban-column');
             
-            if (dropTarget) {
-                dropTarget.appendChild(draggedElement);
+            if (dropTarget && taskId) {
+                const newStatus = dropTarget.getAttribute('data-status');
                 
-                // Optional: Update styling based on column
-                if(dropTarget.id === 'done') {
-                    draggedElement.classList.add('opacity-70');
-                    draggedElement.querySelector('h4').classList.add('line-through', 'text-gray-300');
-                    draggedElement.querySelector('h4').classList.remove('text-white');
-                } else {
-                    draggedElement.classList.remove('opacity-70');
-                    draggedElement.querySelector('h4').classList.remove('line-through', 'text-gray-300');
-                    draggedElement.querySelector('h4').classList.add('text-white');
-                }
+                // Update task status via AJAX
+                updateTaskStatus(taskId, newStatus, draggedElement, dropTarget);
             }
+        }
+
+        // Update task status via AJAX
+        function updateTaskStatus(taskId, status, element, targetColumn) {
+            const formData = new FormData();
+            formData.append('action', 'update_status');
+            formData.append('task_id', taskId);
+            formData.append('status', status);
+
+            fetch('tasks.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Move element to new column
+                    targetColumn.appendChild(element);
+                    
+                    // Update styling based on status
+                    if(status === 'done') {
+                        element.classList.add('opacity-70');
+                        const title = element.querySelector('h4');
+                        if (title) {
+                            title.classList.add('line-through', 'text-gray-300');
+                            title.classList.remove('text-white');
+                        }
+                    } else {
+                        element.classList.remove('opacity-70');
+                        const title = element.querySelector('h4');
+                        if (title) {
+                            title.classList.remove('line-through', 'text-gray-300');
+                            title.classList.add('text-white');
+                        }
+                    }
+                    
+                    // Update task counts
+                    updateTaskCounts();
+                } else {
+                    alert('Failed to update task status');
+                    location.reload();
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to update task status');
+                location.reload();
+            });
+        }
+
+        // Update task counts (simple reload for now)
+        function updateTaskCounts() {
+            // Could implement AJAX to update counts without reload
+            // For now, we'll just reload after a short delay
+            setTimeout(() => {
+                location.reload();
+            }, 500);
+        }
+
+        // Filter tasks
+        function filterTasks() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const taskCards = document.querySelectorAll('.task-card');
+            
+            taskCards.forEach(card => {
+                const taskName = card.querySelector('h4').textContent.toLowerCase();
+                const taskDesc = card.querySelector('p') ? card.querySelector('p').textContent.toLowerCase() : '';
+                
+                if (taskName.includes(searchTerm) || taskDesc.includes(searchTerm)) {
+                    card.style.display = '';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+
+        // Sort tasks (placeholder - would need server-side implementation)
+        function sortTasks() {
+            // This would require server-side sorting
+            location.reload();
         }
 
         // Clean up drag styles if dropped outside
