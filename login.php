@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign Up - TaskFlow</title>
+    <title>Log In - TaskFlow</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -70,8 +70,8 @@
         <!-- Background Image -->
         <div class="absolute inset-0 z-0">
             <img 
-                src="https://images.unsplash.com/photo-1614850523459-c2f4c699c52e?q=80&w=2070&auto=format&fit=crop" 
-                alt="Abstract Neon Fluid" 
+                src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1964&auto=format&fit=crop" 
+                alt="Abstract Neon Lines" 
                 class="w-full h-full object-cover"
             >
             <!-- Overlay Gradient to match brand -->
@@ -87,26 +87,11 @@
             </div>
 
             <div class="mb-12">
-                <h2 class="text-4xl font-bold mb-6">Join the <br><span class="text-cyan-400">Future of Work.</span></h2>
+                <h2 class="text-4xl font-bold mb-6">Welcome <br><span class="text-cyan-400">Back, Creator.</span></h2>
                 <div class="space-y-4">
-                    <div class="flex items-center text-gray-200">
-                        <div class="p-2 rounded-full bg-white/10 mr-4 backdrop-blur-md border border-white/10">
-                            <i data-lucide="zap" class="w-5 h-5 text-yellow-400"></i>
-                        </div>
-                        <p class="font-medium">Boost productivity by 200%</p>
-                    </div>
-                    <div class="flex items-center text-gray-200">
-                        <div class="p-2 rounded-full bg-white/10 mr-4 backdrop-blur-md border border-white/10">
-                            <i data-lucide="shield" class="w-5 h-5 text-green-400"></i>
-                        </div>
-                        <p class="font-medium">Enterprise-grade security</p>
-                    </div>
-                    <div class="flex items-center text-gray-200">
-                        <div class="p-2 rounded-full bg-white/10 mr-4 backdrop-blur-md border border-white/10">
-                            <i data-lucide="users" class="w-5 h-5 text-purple-400"></i>
-                        </div>
-                        <p class="font-medium">Real-time collaboration</p>
-                    </div>
+                    <p class="text-gray-300 text-lg max-w-md leading-relaxed">
+                        Your workspace is ready. Pick up exactly where you left off and keep the momentum going.
+                    </p>
                 </div>
             </div>
 
@@ -116,7 +101,7 @@
         </div>
     </div>
 
-    <!-- Right Side: Signup Form -->
+    <!-- Right Side: Login Form -->
     <div class="w-full lg:w-1/2 flex items-center justify-center p-8 bg-[#050510] relative">
         <!-- Mobile Background Blob -->
         <div class="lg:hidden absolute top-[-20%] right-[-20%] w-[500px] h-[500px] bg-purple-600/20 rounded-full blur-[100px] pointer-events-none"></div>
@@ -130,20 +115,12 @@
             </div>
 
             <div class="text-center mb-10">
-                <h1 class="text-3xl font-bold mb-2">Create Account</h1>
-                <p class="text-gray-400">Start organizing your life today.</p>
+                <h1 class="text-3xl font-bold mb-2">Log In</h1>
+                <p class="text-gray-400">Enter your credentials to access your account.</p>
             </div>
 
-            <form action="#" method="POST" class="space-y-5">
-                <!-- Name -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-400 mb-2">Full Name</label>
-                    <div class="relative">
-                        <i data-lucide="user" class="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500"></i>
-                        <input type="text" placeholder="John Doe" class="w-full pl-12 pr-4 py-3 rounded-xl glass-input text-white placeholder-gray-600 focus:ring-0">
-                    </div>
-                </div>
-
+            <form action="#" method="POST" class="space-y-6">
+                
                 <!-- Email -->
                 <div>
                     <label class="block text-sm font-medium text-gray-400 mb-2">Email Address</label>
@@ -155,45 +132,39 @@
 
                 <!-- Password -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-400 mb-2">Password</label>
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="block text-sm font-medium text-gray-400">Password</label>
+                        <a href="#" class="text-xs text-cyan-400 hover:text-cyan-300">Forgot Password?</a>
+                    </div>
                     <div class="relative">
                         <i data-lucide="lock" class="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500"></i>
                         <input type="password" placeholder="••••••••" class="w-full pl-12 pr-4 py-3 rounded-xl glass-input text-white placeholder-gray-600 focus:ring-0">
                     </div>
                 </div>
 
-                <!-- Confirm Password -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-400 mb-2">Confirm Password</label>
-                    <div class="relative">
-                        <i data-lucide="lock-keyhole" class="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500"></i>
-                        <input type="password" placeholder="••••••••" class="w-full pl-12 pr-4 py-3 rounded-xl glass-input text-white placeholder-gray-600 focus:ring-0">
-                    </div>
-                </div>
-
-                <!-- Terms -->
+                <!-- Remember Me -->
                 <div class="flex items-center">
-                    <input id="terms" type="checkbox" class="h-4 w-4 rounded border-gray-600 bg-gray-700 text-cyan-500 focus:ring-cyan-500/20">
-                    <label for="terms" class="ml-2 block text-sm text-gray-400">
-                        I agree to the <a href="#" class="text-cyan-400 hover:text-cyan-300">Terms</a> and <a href="#" class="text-cyan-400 hover:text-cyan-300">Privacy Policy</a>
+                    <input id="remember" type="checkbox" class="h-4 w-4 rounded border-gray-600 bg-gray-700 text-cyan-500 focus:ring-cyan-500/20">
+                    <label for="remember" class="ml-2 block text-sm text-gray-400">
+                        Remember me for 30 days
                     </label>
                 </div>
 
                 <!-- Submit Button -->
                 <button type="button" class="w-full py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold text-lg btn-glow shadow-lg shadow-cyan-500/20 mt-4">
-                    Create Account
+                    Sign In
                 </button>
             </form>
 
-            <!-- Login Link -->
+            <!-- Signup Link -->
             <div class="text-center mt-8">
                 <p class="text-gray-400 text-sm">
-                    Already have an account? 
-                    <a href="login.php" class="text-cyan-400 font-bold hover:text-cyan-300 transition-colors">Log In</a>
+                    Don't have an account? 
+                    <a href="signup.php" class="text-cyan-400 font-bold hover:text-cyan-300 transition-colors">Sign Up</a>
                 </p>
             </div>
             
-            <!-- Social Sign up (Optional) -->
+            <!-- Social Login -->
             <div class="mt-8 pt-8 border-t border-gray-800">
                 <div class="flex justify-center gap-4">
                     <button class="p-3 rounded-full bg-white/5 hover:bg-white/10 transition-colors border border-white/10">
