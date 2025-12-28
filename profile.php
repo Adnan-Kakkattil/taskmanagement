@@ -42,9 +42,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
                 
                 $message = 'Profile updated successfully!';
                 $messageType = 'success';
-                
-                // Refresh user data
-                $currentUser = getCurrentUser();
             }
         }
     } catch (Exception $e) {
@@ -215,57 +212,12 @@ try {
 </head>
 <body class="flex h-screen overflow-hidden">
 
-    <!-- Mobile Sidebar Overlay -->
-    <div id="mobile-overlay" class="fixed inset-0 z-20 mobile-overlay hidden lg:hidden" onclick="toggleSidebar()"></div>
-
-    <!-- Sidebar -->
-    <aside id="sidebar" class="fixed inset-y-0 left-0 z-30 w-64 glass-panel border-r border-r-white/5 transform -translate-x-full lg:translate-x-0 lg:static lg:inset-auto flex flex-col sidebar bg-[#050510]">
-        <!-- Brand -->
-        <a href="dashboard.php" class="flex items-center justify-center h-20 border-b border-white/5 cursor-pointer">
-            <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded bg-gradient-to-br from-cyan-400 to-purple-600 flex items-center justify-center font-bold text-white">T</div>
-                <span class="font-bold text-xl tracking-wider text-white">Task<span class="text-cyan-400">Flow</span></span>
-            </div>
-        </a>
-
-        <!-- Nav Links -->
-        <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-            <a href="dashboard.php" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
-                <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
-                <span class="font-medium">Dashboard</span>
-            </a>
-            <a href="tasks.php" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
-                <i data-lucide="check-square" class="w-5 h-5"></i>
-                <span class="font-medium">My Tasks</span>
-            </a>
-            <a href="projects.php" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
-                <i data-lucide="folder-kanban" class="w-5 h-5"></i>
-                <span class="font-medium">Projects</span>
-            </a>
-            <a href="team.php" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
-                <i data-lucide="users" class="w-5 h-5"></i>
-                <span class="font-medium">Team</span>
-            </a>
-            <a href="calender.php" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
-                <i data-lucide="calendar" class="w-5 h-5"></i>
-                <span class="font-medium">Calendar</span>
-            </a>
-        </nav>
-
-        <!-- User Profile (Bottom) - Active State -->
-        <div class="p-4 border-t border-white/5">
-            <a href="profile.php" class="flex items-center gap-3 p-3 rounded-xl bg-white/10 border border-white/5 cursor-pointer transition-colors hover:bg-white/15">
-                <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-500 to-cyan-500 p-[2px]">
-                    <img src="<?php echo htmlspecialchars($avatarUrl); ?>" class="w-full h-full rounded-full object-cover border-2 border-[#050510]" alt="User">
-                </div>
-                <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-white truncate"><?php echo htmlspecialchars($userData['full_name']); ?></p>
-                    <p class="text-xs text-gray-400 truncate"><?php echo ucfirst($userData['role']); ?></p>
-                </div>
-                <i data-lucide="settings" class="w-4 h-4 text-cyan-400"></i>
-            </a>
-        </div>
-    </aside>
+    <?php
+    // Include dynamic sidebar
+    $currentPage = 'profile';
+    $showTaskCount = false; // Profile page doesn't need task count
+    include 'sidebar.php';
+    ?>
 
     <!-- Main Content -->
     <main class="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#050510]">
@@ -355,15 +307,35 @@ try {
                         </div>
                     </div>
 
-                    <!-- Skills / Tags -->
+                    <!-- Teams / Tags -->
                     <div class="glass-panel rounded-2xl p-6">
-                        <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-4">Skills</h3>
+                        <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-4">My Teams</h3>
                         <div class="flex flex-wrap gap-2">
-                            <span class="px-3 py-1 rounded-full text-xs bg-purple-500/10 text-purple-400 border border-purple-500/20">UI Design</span>
-                            <span class="px-3 py-1 rounded-full text-xs bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">Figma</span>
-                            <span class="px-3 py-1 rounded-full text-xs bg-green-500/10 text-green-400 border border-green-500/20">Prototyping</span>
-                            <span class="px-3 py-1 rounded-full text-xs bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">User Research</span>
-                            <span class="px-3 py-1 rounded-full text-xs bg-pink-500/10 text-pink-400 border border-pink-500/20">HTML/CSS</span>
+                            <?php if (!empty($userTeams)): ?>
+                                <?php 
+                                $colorClasses = [
+                                    'bg-purple-500/10 text-purple-400 border-purple-500/20',
+                                    'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+                                    'bg-green-500/10 text-green-400 border-green-500/20',
+                                    'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+                                    'bg-pink-500/10 text-pink-400 border-pink-500/20',
+                                    'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                                ];
+                                $colorIndex = 0;
+                                foreach ($userTeams as $team): 
+                                    $colorClass = $colorClasses[$colorIndex % count($colorClasses)];
+                                    $colorIndex++;
+                                ?>
+                                    <span class="px-3 py-1 rounded-full text-xs <?php echo $colorClass; ?> border">
+                                        <?php echo htmlspecialchars($team['team_name']); ?>
+                                        <?php if ($team['team_role'] === 'leader'): ?>
+                                            <span class="ml-1">👑</span>
+                                        <?php endif; ?>
+                                    </span>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <p class="text-sm text-gray-500">Not a member of any teams yet</p>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -484,20 +456,7 @@ try {
         // Initialize Icons
         lucide.createIcons();
 
-        // Toggle Sidebar
-        const sidebar = document.getElementById('sidebar');
-        const overlay = document.getElementById('mobile-overlay');
-
-        function toggleSidebar() {
-            const isClosed = sidebar.classList.contains('-translate-x-full');
-            if (isClosed) {
-                sidebar.classList.remove('-translate-x-full');
-                overlay.classList.remove('hidden');
-            } else {
-                sidebar.classList.add('-translate-x-full');
-                overlay.classList.add('hidden');
-            }
-        }
+        // Toggle Sidebar function is now in sidebar.php
     </script>
 </body>
 </html>

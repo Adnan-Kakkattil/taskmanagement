@@ -277,60 +277,11 @@ $projects = getAllProjects();
 </head>
 <body class="flex h-screen overflow-hidden">
 
-    <!-- Mobile Sidebar Overlay -->
-    <div id="mobile-overlay" class="fixed inset-0 z-20 mobile-overlay hidden lg:hidden" onclick="toggleSidebar()"></div>
-
-    <!-- Sidebar -->
-    <aside id="sidebar" class="fixed inset-y-0 left-0 z-30 w-64 glass-panel border-r border-r-white/5 transform -translate-x-full lg:translate-x-0 lg:static lg:inset-auto flex flex-col sidebar bg-[#050510]">
-        <!-- Brand -->
-        <a href="dashboard.php" class="flex items-center justify-center h-20 border-b border-white/5 cursor-pointer">
-            <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded bg-gradient-to-br from-cyan-400 to-purple-600 flex items-center justify-center font-bold text-white">T</div>
-                <span class="font-bold text-xl tracking-wider text-white">Task<span class="text-cyan-400">Flow</span></span>
-            </div>
-        </a>
-
-        <!-- Nav Links -->
-        <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-            <a href="dashboard.php" class="flex items-center gap-3 px-4 py-3 text-cyan-400 bg-cyan-400/10 rounded-xl border border-cyan-400/20 transition-all">
-                <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
-                <span class="font-medium">Dashboard</span>
-            </a>
-            <a href="tasks.php" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
-                <i data-lucide="check-square" class="w-5 h-5"></i>
-                <span class="font-medium">My Tasks</span>
-                <span class="ml-auto text-xs bg-white/10 px-2 py-1 rounded-full text-white"><?php echo $stats['total_tasks'] ?? 0; ?></span>
-            </a>
-            <a href="projects.php" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
-                <i data-lucide="folder-kanban" class="w-5 h-5"></i>
-                <span class="font-medium">Projects</span>
-            </a>
-            <a href="team.php" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
-                <i data-lucide="users" class="w-5 h-5"></i>
-                <span class="font-medium">Team</span>
-            </a>
-            <a href="calender.php" class="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
-                <i data-lucide="calendar" class="w-5 h-5"></i>
-                <span class="font-medium">Calendar</span>
-            </a>
-        </nav>
-
-        <!-- User Profile (Bottom) -->
-        <div class="p-4 border-t border-white/5">
-            <a href="profile.php" class="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 cursor-pointer transition-colors">
-                <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-500 to-cyan-500 p-[2px]">
-                    <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100&auto=format&fit=crop" class="w-full h-full rounded-full object-cover border-2 border-[#050510]" alt="User">
-                </div>
-                <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-white truncate"><?php echo htmlspecialchars($currentUser['full_name'] ?? 'User'); ?></p>
-                    <p class="text-xs text-gray-400 truncate"><?php echo ucfirst($currentUser['role'] ?? 'member'); ?></p>
-                </div>
-                <a href="logout.php" class="text-gray-500 hover:text-red-400 transition-colors">
-                    <i data-lucide="log-out" class="w-4 h-4"></i>
-                </a>
-            </a>
-        </div>
-    </aside>
+    <?php
+    // Include dynamic sidebar
+    $currentPage = 'dashboard';
+    include 'sidebar.php';
+    ?>
 
     <!-- Main Content -->
     <main class="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#050510]">
@@ -443,7 +394,7 @@ $projects = getAllProjects();
                 <div class="lg:col-span-2 glass-panel rounded-2xl p-6">
                     <div class="flex items-center justify-between mb-6">
                         <h2 class="text-lg font-bold">Recent Tasks</h2>
-                        <button class="text-sm text-cyan-400 hover:text-cyan-300">View All</button>
+                        <a href="tasks.php" class="text-sm text-cyan-400 hover:text-cyan-300">View All</a>
                     </div>
                     
                     <div class="overflow-x-auto">
@@ -458,46 +409,39 @@ $projects = getAllProjects();
                                 </tr>
                             </thead>
                             <tbody class="text-sm">
-                                <!-- Row 1 -->
+                                <?php if (empty($recentTasks)): ?>
+                                <tr>
+                                    <td colspan="5" class="py-8 text-center text-gray-500">No tasks found. Create your first task!</td>
+                                </tr>
+                                <?php else: ?>
+                                <?php foreach ($recentTasks as $task): 
+                                    $priority = getPriorityDisplay($task['priority']);
+                                    $statusClass = 'status-' . $task['status'];
+                                    $statusText = ucfirst(str_replace('_', ' ', $task['status']));
+                                    if ($task['status'] == 'progress') {
+                                        $statusText = 'In Progress';
+                                    }
+                                ?>
                                 <tr class="group hover:bg-white/5 transition-colors border-b border-white/5">
-                                    <td class="py-4 pl-2 font-medium">Design System Update</td>
-                                    <td class="py-4"><span class="flex items-center gap-1 status-high"><div class="w-2 h-2 rounded-full bg-red-400"></div> High</span></td>
-                                    <td class="py-4"><span class="status-badge status-progress">In Progress</span></td>
-                                    <td class="py-4 text-gray-400">Oct 24</td>
+                                    <td class="py-4 pl-2 font-medium"><?php echo htmlspecialchars($task['name']); ?></td>
+                                    <td class="py-4">
+                                        <span class="flex items-center gap-1 <?php echo $priority['class']; ?>">
+                                            <div class="w-2 h-2 rounded-full <?php echo $priority['dot']; ?>"></div> 
+                                            <?php echo $priority['text']; ?>
+                                        </span>
+                                    </td>
+                                    <td class="py-4">
+                                        <span class="status-badge <?php echo $statusClass; ?>"><?php echo $statusText; ?></span>
+                                    </td>
+                                    <td class="py-4 text-gray-400">
+                                        <?php echo $task['due_date'] ? formatDate($task['due_date']) : 'No date'; ?>
+                                    </td>
                                     <td class="py-4 text-right">
                                         <button class="p-1 hover:text-cyan-400 text-gray-400"><i data-lucide="more-horizontal" class="w-4 h-4"></i></button>
                                     </td>
                                 </tr>
-                                <!-- Row 2 -->
-                                <tr class="group hover:bg-white/5 transition-colors border-b border-white/5">
-                                    <td class="py-4 pl-2 font-medium">Integration API Fix</td>
-                                    <td class="py-4"><span class="flex items-center gap-1 status-high"><div class="w-2 h-2 rounded-full bg-red-400"></div> High</span></td>
-                                    <td class="py-4"><span class="status-badge status-pending">Pending</span></td>
-                                    <td class="py-4 text-gray-400">Oct 25</td>
-                                    <td class="py-4 text-right">
-                                        <button class="p-1 hover:text-cyan-400 text-gray-400"><i data-lucide="more-horizontal" class="w-4 h-4"></i></button>
-                                    </td>
-                                </tr>
-                                <!-- Row 3 -->
-                                <tr class="group hover:bg-white/5 transition-colors border-b border-white/5">
-                                    <td class="py-4 pl-2 font-medium">Client Meeting Prep</td>
-                                    <td class="py-4"><span class="flex items-center gap-1 status-med"><div class="w-2 h-2 rounded-full bg-yellow-400"></div> Medium</span></td>
-                                    <td class="py-4"><span class="status-badge status-done">Done</span></td>
-                                    <td class="py-4 text-gray-400">Oct 22</td>
-                                    <td class="py-4 text-right">
-                                        <button class="p-1 hover:text-cyan-400 text-gray-400"><i data-lucide="more-horizontal" class="w-4 h-4"></i></button>
-                                    </td>
-                                </tr>
-                                <!-- Row 4 -->
-                                <tr class="group hover:bg-white/5 transition-colors">
-                                    <td class="py-4 pl-2 font-medium">Homepage Animation</td>
-                                    <td class="py-4"><span class="flex items-center gap-1 status-low"><div class="w-2 h-2 rounded-full bg-green-400"></div> Low</span></td>
-                                    <td class="py-4"><span class="status-badge status-progress">In Progress</span></td>
-                                    <td class="py-4 text-gray-400">Oct 30</td>
-                                    <td class="py-4 text-right">
-                                        <button class="p-1 hover:text-cyan-400 text-gray-400"><i data-lucide="more-horizontal" class="w-4 h-4"></i></button>
-                                    </td>
-                                </tr>
+                                <?php endforeach; ?>
+                                <?php endif; ?>
                             </tbody>
                         </table>
                     </div>
@@ -517,24 +461,32 @@ $projects = getAllProjects();
                     <div class="glass-panel p-6 rounded-2xl">
                         <h2 class="text-lg font-bold mb-4">Upcoming Deadlines</h2>
                         <div class="space-y-4">
+                            <?php if (empty($upcomingDeadlines)): ?>
+                            <div class="text-center text-gray-500 text-sm py-4">No upcoming deadlines</div>
+                            <?php else: ?>
+                            <?php foreach ($upcomingDeadlines as $deadline): 
+                                $dueDate = strtotime($deadline['due_date']);
+                                $day = date('j', $dueDate);
+                                $isToday = date('Y-m-d', $dueDate) == date('Y-m-d');
+                                $isOverdue = $dueDate < strtotime('today');
+                                $bgColor = $isOverdue ? 'bg-red-500/10 text-red-400' : ($isToday ? 'bg-yellow-500/10 text-yellow-400' : 'bg-cyan-500/10 text-cyan-400');
+                            ?>
                             <div class="flex items-center gap-4">
-                                <div class="w-12 h-12 rounded-xl bg-red-500/10 flex items-center justify-center text-red-400">
-                                    <span class="font-bold text-sm">24</span>
+                                <div class="w-12 h-12 rounded-xl <?php echo $bgColor; ?> flex items-center justify-center">
+                                    <span class="font-bold text-sm"><?php echo $day; ?></span>
                                 </div>
-                                <div>
-                                    <p class="font-medium">Database Migration</p>
-                                    <p class="text-xs text-gray-400">Database Team • 10:00 AM</p>
+                                <div class="flex-1 min-w-0">
+                                    <p class="font-medium truncate"><?php echo htmlspecialchars($deadline['name']); ?></p>
+                                    <p class="text-xs text-gray-400">
+                                        <?php if ($deadline['project_name']): ?>
+                                        <?php echo htmlspecialchars($deadline['project_name']); ?> • 
+                                        <?php endif; ?>
+                                        <?php echo formatDate($deadline['due_date']); ?>
+                                    </p>
                                 </div>
                             </div>
-                            <div class="flex items-center gap-4">
-                                <div class="w-12 h-12 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-400">
-                                    <span class="font-bold text-sm">26</span>
-                                </div>
-                                <div>
-                                    <p class="font-medium">Quarterly Review</p>
-                                    <p class="text-xs text-gray-400">Management • 02:00 PM</p>
-                                </div>
-                            </div>
+                            <?php endforeach; ?>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -594,8 +546,13 @@ $projects = getAllProjects();
 
                 <!-- Project/Category (Optional) -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-400 mb-2">Project/Category</label>
-                    <input type="text" name="project" class="w-full px-4 py-3 rounded-xl glass-input text-white placeholder-gray-500" placeholder="Optional project name">
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Project (Optional)</label>
+                    <select name="project_id" class="w-full px-4 py-3 rounded-xl glass-input text-white">
+                        <option value="">No Project</option>
+                        <?php foreach ($projects as $project): ?>
+                        <option value="<?php echo $project['id']; ?>"><?php echo htmlspecialchars($project['name']); ?></option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
 
                 <!-- Form Actions -->
@@ -616,20 +573,7 @@ $projects = getAllProjects();
         // Initialize Icons
         lucide.createIcons();
 
-        // Toggle Sidebar for Mobile
-        const sidebar = document.getElementById('sidebar');
-        const overlay = document.getElementById('mobile-overlay');
-
-        function toggleSidebar() {
-            const isClosed = sidebar.classList.contains('-translate-x-full');
-            if (isClosed) {
-                sidebar.classList.remove('-translate-x-full');
-                overlay.classList.remove('hidden');
-            } else {
-                sidebar.classList.add('-translate-x-full');
-                overlay.classList.add('hidden');
-            }
-        }
+        // Toggle Sidebar function is now in sidebar.php
 
         // Initialize Chart.js
         const ctx = document.getElementById('taskChart').getContext('2d');
@@ -642,10 +586,10 @@ $projects = getAllProjects();
         const taskChart = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                labels: <?php echo json_encode($chartLabels); ?>,
                 datasets: [{
                     label: 'Tasks Completed',
-                    data: [4, 6, 8, 5, 10, 7, 12],
+                    data: <?php echo json_encode($chartData); ?>,
                     backgroundColor: gradient,
                     borderColor: '#00f3ff',
                     borderWidth: 2,
@@ -735,24 +679,67 @@ $projects = getAllProjects();
             event.preventDefault();
             
             const formData = new FormData(event.target);
-            const taskData = {
-                taskName: formData.get('taskName'),
-                description: formData.get('description'),
-                priority: formData.get('priority'),
-                status: formData.get('status'),
-                dueDate: formData.get('dueDate'),
-                project: formData.get('project')
-            };
+            const submitData = new FormData();
+            submitData.append('action', 'create_task');
+            submitData.append('name', formData.get('taskName'));
+            submitData.append('description', formData.get('description'));
+            submitData.append('priority', formData.get('priority'));
+            submitData.append('status', formData.get('status'));
+            submitData.append('due_date', formData.get('dueDate'));
+            const projectId = formData.get('project_id');
+            if (projectId) {
+                submitData.append('project_id', projectId);
+            }
+            const assignedTo = formData.get('assigned_to');
+            if (assignedTo) {
+                submitData.append('assigned_to', assignedTo);
+            } else {
+                // Assign to current user if not specified
+                submitData.append('assigned_to', <?php echo $userId; ?>);
+            }
 
-            // Here you would normally send this to a backend API
-            // For now, we'll just show a success message and close the modal
-            console.log('New Task Created:', taskData);
+            // Send to API
+            fetch('api.php', {
+                method: 'POST',
+                body: submitData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success notification
+                    showNotification('Task created successfully!', 'success');
+                    
+                    // Close modal and reset form
+                    closeTaskModal();
+                    
+                    // Reload page after a short delay to show new task
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 500);
+                } else {
+                    showNotification(data.message || 'Failed to create task. Please try again.', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('An error occurred. Please try again.', 'error');
+            });
+        }
+
+        // Show notification
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 z-50 px-6 py-4 rounded-lg shadow-lg ${
+                type === 'success' ? 'bg-green-500/90 text-white' : 'bg-red-500/90 text-white'
+            }`;
+            notification.textContent = message;
+            document.body.appendChild(notification);
             
-            // Show success notification
-            alert('Task "' + taskData.taskName + '" created successfully!');
-            
-            // Close modal and reset form
-            closeTaskModal();
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                notification.style.transition = 'opacity 0.3s';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
         }
     </script>
 </body>
