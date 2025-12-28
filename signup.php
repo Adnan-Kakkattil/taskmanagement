@@ -1,3 +1,60 @@
+<?php
+require_once 'config.php';
+
+$error = '';
+$success = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $full_name = trim($_POST['full_name'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $password = $_POST['password'] ?? '';
+    $confirm_password = $_POST['confirm_password'] ?? '';
+    $terms = isset($_POST['terms']) ? true : false;
+    
+    // Validation
+    if (empty($full_name)) {
+        $error = 'Full name is required';
+    } elseif (empty($email)) {
+        $error = 'Email is required';
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error = 'Invalid email format';
+    } elseif (empty($password)) {
+        $error = 'Password is required';
+    } elseif (strlen($password) < 6) {
+        $error = 'Password must be at least 6 characters';
+    } elseif ($password !== $confirm_password) {
+        $error = 'Passwords do not match';
+    } elseif (!$terms) {
+        $error = 'You must agree to the terms and conditions';
+    } else {
+        try {
+            $pdo = getDBConnection();
+            
+            // Check if email already exists
+            $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
+            $stmt->execute([$email]);
+            if ($stmt->fetch()) {
+                $error = 'Email already registered. Please login instead.';
+            } else {
+                // Hash password
+                $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+                
+                // Insert new user
+                $stmt = $pdo->prepare("INSERT INTO users (full_name, email, password, role) VALUES (?, ?, ?, 'member')");
+                $stmt->execute([$full_name, $email, $hashed_password]);
+                
+                $success = 'Account created successfully! Redirecting to login...';
+                
+                // Redirect to login after 2 seconds
+                header("refresh:2;url=login.php");
+                exit;
+            }
+        } catch (PDOException $e) {
+            $error = 'Registration failed. Please try again.';
+        }
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -133,14 +190,26 @@
                 <h1 class="text-3xl font-bold mb-2">Create Account</h1>
                 <p class="text-gray-400">Start organizing your life today.</p>
             </div>
-
-            <form action="#" method="POST" class="space-y-5">
+            
+            <?php if ($error): ?>
+                <div class="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                    <?php echo htmlspecialchars($error); ?>
+                </div>
+            <?php endif; ?>
+            
+            <?php if ($success): ?>
+                <div class="mb-4 p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-sm">
+                    <?php echo htmlspecialchars($success); ?>
+                </div>
+            <?php endif; ?>
+            
+            <form action="signup.php" method="POST" class="space-y-5">
                 <!-- Name -->
                 <div>
                     <label class="block text-sm font-medium text-gray-400 mb-2">Full Name</label>
                     <div class="relative">
                         <i data-lucide="user" class="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500"></i>
-                        <input type="text" placeholder="John Doe" class="w-full pl-12 pr-4 py-3 rounded-xl glass-input text-white placeholder-gray-600 focus:ring-0">
+                        <input type="text" name="full_name" placeholder="John Doe" value="<?php echo htmlspecialchars($_POST['full_name'] ?? ''); ?>" class="w-full pl-12 pr-4 py-3 rounded-xl glass-input text-white placeholder-gray-600 focus:ring-0" required>
                     </div>
                 </div>
 
@@ -149,7 +218,7 @@
                     <label class="block text-sm font-medium text-gray-400 mb-2">Email Address</label>
                     <div class="relative">
                         <i data-lucide="mail" class="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500"></i>
-                        <input type="email" placeholder="john@example.com" class="w-full pl-12 pr-4 py-3 rounded-xl glass-input text-white placeholder-gray-600 focus:ring-0">
+                        <input type="email" name="email" placeholder="john@example.com" value="<?php echo htmlspecialchars($_POST['email'] ?? ''); ?>" class="w-full pl-12 pr-4 py-3 rounded-xl glass-input text-white placeholder-gray-600 focus:ring-0" required>
                     </div>
                 </div>
 
@@ -158,7 +227,7 @@
                     <label class="block text-sm font-medium text-gray-400 mb-2">Password</label>
                     <div class="relative">
                         <i data-lucide="lock" class="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500"></i>
-                        <input type="password" placeholder="••••••••" class="w-full pl-12 pr-4 py-3 rounded-xl glass-input text-white placeholder-gray-600 focus:ring-0">
+                        <input type="password" name="password" placeholder="••••••••" class="w-full pl-12 pr-4 py-3 rounded-xl glass-input text-white placeholder-gray-600 focus:ring-0" required minlength="6">
                     </div>
                 </div>
 
@@ -167,20 +236,20 @@
                     <label class="block text-sm font-medium text-gray-400 mb-2">Confirm Password</label>
                     <div class="relative">
                         <i data-lucide="lock-keyhole" class="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500"></i>
-                        <input type="password" placeholder="••••••••" class="w-full pl-12 pr-4 py-3 rounded-xl glass-input text-white placeholder-gray-600 focus:ring-0">
+                        <input type="password" name="confirm_password" placeholder="••••••••" class="w-full pl-12 pr-4 py-3 rounded-xl glass-input text-white placeholder-gray-600 focus:ring-0" required minlength="6">
                     </div>
                 </div>
 
                 <!-- Terms -->
                 <div class="flex items-center">
-                    <input id="terms" type="checkbox" class="h-4 w-4 rounded border-gray-600 bg-gray-700 text-cyan-500 focus:ring-cyan-500/20">
+                    <input id="terms" type="checkbox" name="terms" class="h-4 w-4 rounded border-gray-600 bg-gray-700 text-cyan-500 focus:ring-cyan-500/20" required>
                     <label for="terms" class="ml-2 block text-sm text-gray-400">
                         I agree to the <a href="#" class="text-cyan-400 hover:text-cyan-300">Terms</a> and <a href="#" class="text-cyan-400 hover:text-cyan-300">Privacy Policy</a>
                     </label>
                 </div>
 
                 <!-- Submit Button -->
-                <button type="button" class="w-full py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold text-lg btn-glow shadow-lg shadow-cyan-500/20 mt-4">
+                <button type="submit" class="w-full py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold text-lg btn-glow shadow-lg shadow-cyan-500/20 mt-4">
                     Create Account
                 </button>
             </form>

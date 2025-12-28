@@ -1,3 +1,59 @@
+<?php
+require_once 'config.php';
+
+// Redirect if already logged in
+if (isLoggedIn()) {
+    header('Location: dashboard.php');
+    exit;
+}
+
+$error = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $email = trim($_POST['email'] ?? '');
+    $password = $_POST['password'] ?? '';
+    $remember = isset($_POST['remember']) ? true : false;
+    
+    if (empty($email) || empty($password)) {
+        $error = 'Please fill in all fields';
+    } else {
+        try {
+            $pdo = getDBConnection();
+            $stmt = $pdo->prepare("SELECT id, full_name, email, password, role, is_active FROM users WHERE email = ?");
+            $stmt->execute([$email]);
+            $user = $stmt->fetch();
+            
+            if ($user) {
+                // Check if user is active
+                if (!$user['is_active']) {
+                    $error = 'Your account has been deactivated. Please contact support.';
+                } elseif (password_verify($password, $user['password'])) {
+                    // Set session variables
+                    $_SESSION['user_id'] = $user['id'];
+                    $_SESSION['user_name'] = $user['full_name'];
+                    $_SESSION['user_email'] = $user['email'];
+                    $_SESSION['user_role'] = $user['role'];
+                    
+                    // Remember me functionality (30 days)
+                    if ($remember) {
+                        ini_set('session.cookie_lifetime', 60 * 60 * 24 * 30);
+                    }
+                    
+                    // Redirect to dashboard
+                    header('Location: dashboard.php');
+                    exit;
+                } else {
+                    $error = 'Invalid email or password';
+                }
+            } else {
+                $error = 'Invalid email or password';
+            }
+        } catch (PDOException $e) {
+            $error = 'Login failed. Please try again.';
+        }
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -118,15 +174,21 @@
                 <h1 class="text-3xl font-bold mb-2">Log In</h1>
                 <p class="text-gray-400">Enter your credentials to access your account.</p>
             </div>
-
-            <form action="dashboard.php" method="POST" class="space-y-6">
+            
+            <?php if ($error): ?>
+                <div class="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                    <?php echo htmlspecialchars($error); ?>
+                </div>
+            <?php endif; ?>
+            
+            <form action="login.php" method="POST" class="space-y-6">
                 
                 <!-- Email -->
                 <div>
                     <label class="block text-sm font-medium text-gray-400 mb-2">Email Address</label>
                     <div class="relative">
                         <i data-lucide="mail" class="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500"></i>
-                        <input type="email" name="email" placeholder="john@example.com" class="w-full pl-12 pr-4 py-3 rounded-xl glass-input text-white placeholder-gray-600 focus:ring-0" required>
+                        <input type="email" name="email" placeholder="john@example.com" value="<?php echo htmlspecialchars($_POST['email'] ?? ''); ?>" class="w-full pl-12 pr-4 py-3 rounded-xl glass-input text-white placeholder-gray-600 focus:ring-0" required>
                     </div>
                 </div>
 

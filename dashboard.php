@@ -1,3 +1,8 @@
+<?php
+require_once 'config.php';
+requireLogin();
+$currentUser = getCurrentUser();
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -171,10 +176,10 @@
                     <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100&auto=format&fit=crop" class="w-full h-full rounded-full object-cover border-2 border-[#050510]" alt="User">
                 </div>
                 <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-white truncate">Alex Morgan</p>
-                    <p class="text-xs text-gray-400 truncate">Pro Member</p>
+                    <p class="text-sm font-medium text-white truncate"><?php echo htmlspecialchars($currentUser['full_name'] ?? 'User'); ?></p>
+                    <p class="text-xs text-gray-400 truncate"><?php echo ucfirst($currentUser['role'] ?? 'member'); ?></p>
                 </div>
-                <a href="login.php" class="text-gray-500 hover:text-red-400 transition-colors">
+                <a href="logout.php" class="text-gray-500 hover:text-red-400 transition-colors">
                     <i data-lucide="log-out" class="w-4 h-4"></i>
                 </a>
             </a>
